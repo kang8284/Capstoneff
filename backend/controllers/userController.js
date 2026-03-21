@@ -1,33 +1,36 @@
+// backend/controllers/userController.js
 const userModel = require('../models/userModel');
 
-// 전체 아이템 조회
-exports.getUsers = (req, res) => {
-  userModel.getAllItems((err, results) => {
-    if (err) return res.status(500).send(err);
-    res.json(results);
-  });
-};
-
-// 아이템 생성
-exports.createUser = (req, res) => {
+// 전체 세션 조회
+exports.getSessions = async (req, res) => {
   try {
-    const { title, description } = req.body;
-    if (!title) throw new Error('Title 필요');
-
-    userModel.createItem(title, description, (err, result) => {
-      if (err) return res.status(500).json({ message: 'DB insert 실패', error: err });
-      res.json({ message: 'Item created' });
-    });
-  } catch (error) {
-    res.status(500).json({ message: '서버 오류', error: error.message });
+    const sessions = await userModel.getAllSessions();
+    res.json(sessions);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'DB 조회 실패' });
   }
 };
 
-// 아이템 삭제
-exports.deleteUser = (req, res) => {
-  const { id } = req.params;
-  userModel.deleteItem(id, (err) => {
-    if (err) return res.status(500).send(err);
-    res.json({ message: 'Item deleted' });
-  });
+// 세션 생성 (🔥 user_id 제거)
+exports.createSession = async (req, res) => {
+  try {
+    const result = await userModel.createSession();
+    res.json({ session_id: result.insertId });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'DB insert 실패' });
+  }
+};
+
+// 세션 삭제
+exports.deleteSession = async (req, res) => {
+  try {
+    const { id } = req.params;
+    await userModel.deleteSession(id);
+    res.json({ message: '세션 삭제 완료' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'DB 삭제 실패' });
+  }
 };
