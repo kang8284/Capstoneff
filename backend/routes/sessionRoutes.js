@@ -10,5 +10,6 @@ router.delete('/sessions/:id', controller.deleteSession);
 // 🔥 추가 (핵심)
 router.post('/process', controller.processData);
 router.get('/result', controller.getResult);
+router.delete('/admin/reset', controller.resetDatabase);
 
 module.exports = router;
