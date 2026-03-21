@@ -1,30 +1,28 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import { fetchAPI } from '../utils/api';
 
 function MainPage() {
   const navigate = useNavigate();
 
-  const handleStart = () => {
-    console.log('새로운 세션 생성 요청');
+  const handleStart = async () => {
+    try {
+      console.log('세션 생성 요청');
 
-    // user_id 없이 세션만 생성
-    fetch('http://localhost:5000/api/sessions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' }
-    })
-      .then(res => res.json())
-      .then(data => {
-        console.log('세션 생성 완료:', data);
-
-        // 필요하면 session_id 저장 가능
-        localStorage.setItem('session_id', data.session_id);
-
-        navigate('/loading');
-      })
-      .catch(err => {
-        console.error('세션 생성 실패:', err);
-        alert('세션 생성 실패');
+      const data = await fetchAPI('/sessions', {
+        method: 'POST'
       });
+
+      console.log('세션 생성 완료:', data);
+
+      localStorage.setItem('session_id', data.session_id);
+
+      navigate('/loading');
+
+    } catch (err) {
+      console.error(err);
+      alert('세션 생성 실패');
+    }
   };
 
   return (
