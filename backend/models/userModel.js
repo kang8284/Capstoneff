@@ -8,7 +8,7 @@ exports.getAllSessions = async () => {
   return results;
 };
 
-// 세션 생성 (🔥 user_id 제거)
+// 세션 생성 (🔥 session_id 제거)
 exports.createSession = async () => {
   const pool = await poolPromise;
   const sql = 'INSERT INTO user_session () VALUES ()';

@@ -1,0 +1,38 @@
+사용자 목록
+
+USE personaldb;
+
+SELECT 
+    us.session_id,
+    ic.image_id,
+    bar.analysis_id,
+    bar.body_type,
+    r.recommendation_id,
+    r.style_type,
+    o.outfit_id,
+    o.name AS outfit_name
+FROM user_session us
+LEFT JOIN image_check ic ON us.session_id = ic.session_id
+LEFT JOIN body_analysis_result bar ON ic.image_id = bar.image_id
+LEFT JOIN recommendation r ON bar.analysis_id = r.analysis_id
+LEFT JOIN outfit o ON r.recommendation_id = o.recommendation_id
+ORDER BY us.session_id DESC;
+
+시드 데이터 확인
+
+SELECT 
+    us.session_id,
+    ic.image_url,
+    bar.body_type,
+    r.style_type,
+    o.name AS outfit_name,
+    o.category,
+    ot.tag,
+    fr.score
+FROM user_session us
+LEFT JOIN image_check ic ON us.session_id = ic.session_id
+LEFT JOIN body_analysis_result bar ON ic.image_id = bar.image_id
+LEFT JOIN recommendation r ON bar.analysis_id = r.analysis_id
+LEFT JOIN outfit o ON r.recommendation_id = o.recommendation_id
+LEFT JOIN outfit_tag_map ot ON o.outfit_id = ot.outfit_id
+LEFT JOIN fitting_result fr ON us.session_id = fr.session_id;
