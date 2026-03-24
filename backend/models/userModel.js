@@ -1,26 +1,25 @@
-// backend/models/userModel.js
-const poolPromise = require('../config/db');
+let dbPool;
+
+exports.setPool = (pool) => {
+  dbPool = pool;
+};
 
 // 전체 세션 조회
 exports.getAllSessions = async () => {
-  const pool = await poolPromise;
-  const [results] = await pool.query('SELECT * FROM user_session');
+  const [results] = await dbPool.query('SELECT * FROM user_session');
   return results;
 };
 
-// 세션 생성 (🔥 session_id 제거)
+// 세션 생성
 exports.createSession = async () => {
-  const pool = await poolPromise;
-  const sql = 'INSERT INTO user_session () VALUES ()';
-  const [result] = await pool.query(sql);
+  const [result] = await dbPool.query('INSERT INTO user_session () VALUES ()');
   return result;
 };
 
 // 세션 삭제
 exports.deleteSession = async (session_id) => {
-  const pool = await poolPromise;
-  const [result] = await pool.query(
-    'DELETE FROM user_session WHERE session_id = ?', 
+  const [result] = await dbPool.query(
+    'DELETE FROM user_session WHERE session_id = ?',
     [session_id]
   );
   return result;

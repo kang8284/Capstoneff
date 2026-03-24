@@ -1,84 +1,49 @@
-const poolPromise = require('../config/db');
+// backend/seed/index.js
 
-// 🔹 템플릿용 analysis 시드
 const { seedTemplateAnalysis } = require('./analysis.seed');
-
 const seedRecommendation = require('./recommendation.seed');
 const seedOutfit = require('./outfit.seed');
 const seedTag = require('./tag.seed');
 
-async function runSeed() {
+async function runSeed(pool) {
   try {
-    const pool = await poolPromise;
-
     console.log('🌱 Seed 시작');
 
-    // =========================
-    // 1️⃣ analysis 템플릿용 더미 생성
-    // =========================
-    const analysisId = await seedTemplateAnalysis();
-    console.log('🧱 템플릿 analysis ID:', analysisId);
+    // 0️⃣ 초기화
+    await pool.query('SET FOREIGN_KEY_CHECKS = 0');
 
-    // =========================
+    await pool.query('TRUNCATE TABLE outfit_tag_map');
+    await pool.query('TRUNCATE TABLE outfit');
+    await pool.query('TRUNCATE TABLE recommendation');
+    await pool.query('TRUNCATE TABLE body_analysis_result');
+    await pool.query('TRUNCATE TABLE image_check');
+    await pool.query('TRUNCATE TABLE user_session');
+
+    await pool.query('SET FOREIGN_KEY_CHECKS = 1');
+
+    console.log('🧹 전체 초기화 완료');
+
+    // 1️⃣ analysis
+    const analysisId = await seedTemplateAnalysis(pool);
+    console.log('🧱 analysis:', analysisId);
+
     // 2️⃣ recommendation
-    // =========================
-    const [recRows] = await pool.query(
-      `SELECT recommendation_id FROM recommendation LIMIT 1`
-    );
+    const recommendationId = await seedRecommendation(pool, analysisId);
+    console.log('✅ recommendation:', recommendationId);
 
-    let recommendationId;
-
-    if (recRows.length > 0) {
-      recommendationId = recRows[0].recommendation_id;
-      console.log('⚠️ 기존 recommendation 사용:', recommendationId);
-    } else {
-      // ⚡ analysisId를 전달하여 FK 문제 방지
-      recommendationId = await seedRecommendation(analysisId);
-      console.log('✅ recommendation 생성:', recommendationId);
-    }
-
-    // =========================
     // 3️⃣ outfit
-    // =========================
-    const [outfitRows] = await pool.query(
-      `SELECT COUNT(*) as count FROM outfit WHERE recommendation_id = ?`,
-      [recommendationId]
-    );
+    const outfitIds = await seedOutfit(pool, recommendationId);
+    console.log('👕 outfit:', outfitIds);
 
-    let outfitIds;
-
-    if (outfitRows[0].count > 0) {
-      console.log('⚠️ outfit 이미 존재 → 조회');
-
-      const [existing] = await pool.query(
-        `SELECT outfit_id FROM outfit WHERE recommendation_id = ?`,
-        [recommendationId]
-      );
-
-      outfitIds = existing.map(o => o.outfit_id);
-    } else {
-      outfitIds = await seedOutfit(recommendationId);
-      console.log('👕 outfit 생성:', outfitIds);
-    }
-
-    // =========================
     // 4️⃣ tag
-    // =========================
-    const [tagRows] = await pool.query(
-      `SELECT COUNT(*) as count FROM outfit_tag_map`
-    );
-
-    if (tagRows[0].count > 0) {
-      console.log('⚠️ tag 이미 존재 → 스킵');
-    } else {
-      await seedTag(outfitIds);
-      console.log('🏷️ tag 생성 완료');
-    }
+    await seedTag(pool, outfitIds);
+    console.log('🏷️ tag 완료');
 
     console.log('✅ Seed 완료');
 
   } catch (err) {
     console.error('❌ Seed 실패:', err);
+    throw err;
   }
 }
 

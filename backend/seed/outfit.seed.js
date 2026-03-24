@@ -1,9 +1,6 @@
 // backend/seed/outfit.seed.js
-const poolPromise = require('../config/db');
 
-async function seedOutfit(recommendationId) {
-  const pool = await poolPromise;
-
+async function seedOutfit(pool, recommendationId) {
   const [o1] = await pool.query(
     `INSERT INTO outfit (recommendation_id, name, image_url, category)
      VALUES (?, '화이트 셔츠', 'shirt.jpg', '상의')`,
