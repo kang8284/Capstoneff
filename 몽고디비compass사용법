@@ -1,0 +1,3 @@
+https://www.mongodb.com/try/download/compass
+들어가서 다운받고
+mongodb+srv://user:1234@cluster0.dj97lvm.mongodb.net/?appName=Cluster0 로 커낵트 주소 설정 이름은 머 아무거나 해도됨
