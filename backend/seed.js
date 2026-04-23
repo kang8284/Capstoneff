@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 require('dotenv').config();
 
 /* =========================
-   Schema (name 추가)
+   Schema
 ========================= */
 const Outfit = mongoose.model(
   'Outfit',
@@ -11,7 +11,7 @@ const Outfit = mongoose.model(
     bodyType: String,
     style: String,
     category: String,
-    name: String,       // 🔥 추가
+    name: String,
     imageUrl: String
   })
 );
@@ -36,9 +36,6 @@ const names = {
   }
 };
 
-/* =========================
-   seed 실행
-========================= */
 async function seed() {
   try {
     await mongoose.connect(MONGO_URL, {
@@ -56,17 +53,15 @@ async function seed() {
     const bodyTypes = ['스트레이트', '웨이브', '내추럴'];
     const categories = ['top', 'bottom', 'jacket'];
 
-    const img = (name) =>
-      `https://source.unsplash.com/300x300/?clothes,${encodeURIComponent(name)}`;
-
     const data = [];
 
-    genders.forEach((gender) => {
+    for (const gender of genders) {
       const styles = gender === '남자' ? maleStyles : femaleStyles;
 
-      styles.forEach((style) => {
-        bodyTypes.forEach((bodyType) => {
-          categories.forEach((category) => {
+      for (const style of styles) {
+        for (const bodyType of bodyTypes) {
+          for (const category of categories) {
+
             const nameList = names[category][gender];
 
             const randomName =
@@ -77,13 +72,15 @@ async function seed() {
               bodyType,
               style,
               category,
-              name: randomName, // 🔥 핵심 추가
-              imageUrl: img(`${gender}-${style}-${category}`)
+              name: randomName,
+
+              // 🔥 지금은 placeholder (중요)
+              imageUrl: ''
             });
-          });
-        });
-      });
-    });
+          }
+        }
+      }
+    }
 
     await Outfit.insertMany(data);
 

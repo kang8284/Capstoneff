@@ -1,0 +1,23 @@
+터미널
+/backend>
+
+전체 보기
+node cli.js list
+
+검색
+node cli.js search 성별 스타일 의상타입(top/bottom/outer)
+예시
+node cli.js search 남자 캐주얼 top
+
+추가
+node cli.js add 성별 체형타입 의상타입(top/bottom/outer) "의상이름" 의상이미지url
+예시
+node cli.js add 남자 스트레이트 캐주얼 top "셔츠" https://img.com/1.jpg
+
+수정
+node cli.js update <id> name "새 이름"
+예시
+node cli.js update 69e9bf9269ab10e32e125139 name "니트 스웨터1"
+
+삭제
+node cli.js delete <id>
