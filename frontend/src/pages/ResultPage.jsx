@@ -8,9 +8,8 @@ function ResultPage() {
   const data = location.state;
   const [result, setResult] = useState(null);
 
-  // 🔥 1. useEffect는 항상 먼저
   useEffect(() => {
-    if (!data) return; // 🔥 안전장치
+    if (!data) return;
 
     const fetchData = async () => {
       try {
@@ -36,67 +35,114 @@ function ResultPage() {
     fetchData();
   }, [data]);
 
-  // 🔥 2. 조건 return은 여기 (hook 이후)
   if (!data) {
     return (
-      <div>
-        <h2>잘못된 접근입니다</h2>
-        <button onClick={() => navigate('/')}>돌아가기</button>
+      <div className="min-h-screen flex items-center justify-center px-4">
+        <div className="bg-white p-6 rounded-xl shadow w-full max-w-sm">
+          <h2 className="mb-4 text-lg font-semibold text-center">
+            잘못된 접근입니다
+          </h2>
+          <button
+            onClick={() => navigate('/')}
+            className="w-full py-2 bg-gray-800 text-white rounded-lg"
+          >
+            돌아가기
+          </button>
+        </div>
       </div>
     );
   }
 
   return (
-    <div>
-      <h1>추천 결과</h1>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-gray-100 to-indigo-100 px-4 sm:px-6 py-6">
 
-      <p>성별: {data.gender}</p>
-      <p>스타일: {data.style}</p>
+      <div className="max-w-4xl mx-auto space-y-6">
 
-      {/* 🔥 로딩 */}
-      {!result ? (
-        <p>추천 로딩중...</p>
-      ) : (
-        <>
-          <h2>랜덤 체형: {result.bodyType}</h2>
+        {/* ===== 상단 정보 카드 ===== */}
+        <div className="bg-white/80 backdrop-blur p-5 sm:p-6 rounded-xl shadow border border-gray-200">
+          <h1 className="text-xl sm:text-2xl font-bold mb-3 text-gray-800">
+            추천 결과
+          </h1>
 
-          {/* ================= 상의 ================= */}
-          <h3>상의</h3>
-          <div>
-            {result.top?.map((item, i) => (
-              <div key={i} style={{ marginBottom: '10px' }}>
-                <img src={item.imageUrl} width="120" />
-                <p>{item.name}</p>
-              </div>
-            ))}
+          <p className="text-gray-600 text-sm sm:text-base">
+            성별: {data.gender}
+          </p>
+          <p className="text-gray-600 text-sm sm:text-base">
+            스타일: {data.style}
+          </p>
+        </div>
+
+        {/* ===== 로딩 ===== */}
+        {!result ? (
+          <div className="bg-white/80 p-6 rounded-xl shadow text-center animate-pulse">
+            추천 생성 중...
           </div>
+        ) : (
+          <>
+            {/* ===== 체형 카드 ===== */}
+            <div className="bg-white/80 backdrop-blur p-5 sm:p-6 rounded-xl shadow border border-gray-200">
+              <h2 className="text-base sm:text-lg font-semibold text-indigo-500">
+                체형 분석 결과
+              </h2>
+              <p className="text-lg sm:text-xl font-bold mt-2">
+                {result.bodyType}
+              </p>
+            </div>
 
-          {/* ================= 하의 ================= */}
-          <h3>하의</h3>
-          <div>
-            {result.bottom?.map((item, i) => (
-              <div key={i} style={{ marginBottom: '10px' }}>
-                <img src={item.imageUrl} width="120" />
-                <p>{item.name}</p>
-              </div>
-            ))}
+            {/* ===== 의류 섹션 ===== */}
+            <ClothSection title="상의" items={result.top} color="blue" />
+            <ClothSection title="하의" items={result.bottom} color="green" />
+            <ClothSection title="아우터" items={result.jacket} color="purple" />
+          </>
+        )}
+
+        {/* ===== 버튼 ===== */}
+        <button
+          onClick={() => navigate('/')}
+          className="w-full py-3 rounded-xl font-semibold text-white 
+                     bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500
+                     hover:shadow-xl active:scale-95 transition"
+        >
+          다시 입력
+        </button>
+
+      </div>
+    </div>
+  );
+}
+
+/* ================= 공통 카드 섹션 ================= */
+
+function ClothSection({ title, items, color }) {
+  const colorMap = {
+    blue: "text-blue-500",
+    green: "text-green-500",
+    purple: "text-purple-500"
+  };
+
+  return (
+    <div className="bg-white/80 backdrop-blur p-5 sm:p-6 rounded-xl shadow border border-gray-200">
+      <h3 className={`text-base sm:text-lg font-semibold mb-4 ${colorMap[color]}`}>
+        {title}
+      </h3>
+
+      {/* 🔥 반응형 grid 핵심 */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+        {items?.map((item, i) => (
+          <div
+            key={i}
+            className="bg-white rounded-xl shadow-sm p-3 hover:shadow-lg transition"
+          >
+            <img
+              src={item.imageUrl}
+              className="w-full h-40 sm:h-[150px] object-cover rounded-lg"
+            />
+            <p className="mt-2 text-center text-sm font-medium">
+              {item.name}
+            </p>
           </div>
-
-          {/* ================= 아우터 ================= */}
-          <h3>아우터</h3>
-          <div>
-            {result.jacket?.map((item, i) => (
-              <div key={i} style={{ marginBottom: '10px' }}>
-                <img src={item.imageUrl} width="120" />
-                <p>{item.name}</p>
-              </div>
-            ))}
-          </div>
-        </>
-      )}
-
-      <br />
-      <button onClick={() => navigate('/')}>다시 입력</button>
+        ))}
+      </div>
     </div>
   );
 }
