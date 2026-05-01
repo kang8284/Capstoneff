@@ -1,0 +1,8 @@
+https://cloudinary.com/
+여기에 이미지 업로드하고 url가져와서 삽입하면됨
+
+이미지 url가져오는법
+업로드한 이미지 선택 수 Copy URL선택 후 Copy Original with Option 선택 후
+Delivery URL:
+https://res.cloudinary.com/dxxxl1kfo/image/upload/v1776928372/K1692781577790047IV01_LM1_d4rqgl.webp
+이런 식으로 뜨는 URL 가져와서 넣으면 됨

@@ -1,0 +1,11 @@
+{
+  "name": "capstoneff",
+  "version": "1.0.0",
+  "scripts": {
+    "start": "concurrently \"cd backend && node app.js\" \"cd frontend && npm run dev\"",
+    "install:all": "cd backend && npm install && cd ../frontend && npm install"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}
