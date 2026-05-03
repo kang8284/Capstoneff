@@ -1,19 +1,17 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import InputPage from './pages/InputPage';
-import CameraPage from './pages/CameraPage';
-import AnalyzingPage from './pages/AnalyzingPage';
-import ResultPage from './pages/ResultPage';
-import FittingTestPage from './pages/FittingTestPage';
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import Home from "./pages/Home";
+import UserPage from "./pages/UserPage";
+import Camera from "./pages/Camera";
+import ResultPage2 from "./pages/ResultPage2";
 
 function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/"             element={<InputPage />} />
-        <Route path="/camera"       element={<CameraPage />} />
-        <Route path="/analyzing"    element={<AnalyzingPage />} />
-        <Route path="/result"       element={<ResultPage />} />
-        <Route path="/fitting-test" element={<FittingTestPage />} />
+        <Route path="/" element={<Home />} />
+        <Route path="/input" element={<UserPage />} />
+        <Route path="/camera" element={<Camera />} />
+        <Route path="/result" element={<ResultPage2 />} />
       </Routes>
     </BrowserRouter>
   );

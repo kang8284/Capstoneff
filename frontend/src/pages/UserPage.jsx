@@ -2,16 +2,16 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 const maleStyles = [
-  { id: "casual", label: "캐주얼", img: "/images/casual.png" },
-  { id: "street", label: "스트릿", img: "/images/street.png" },
-  { id: "formal", label: "포멀", img: "/images/formal.png" },
+  { id: "casual", label: "캐주얼", img: "/images/casual.jpg" },
+  { id: "street", label: "스트릿", img: "/images/street.jpg" },
+  { id: "formal", label: "포멀", img: "/images/formal.jpg" },
 ];
 
 const femaleStyles = [
-  { id: "casual", label: "캐주얼", img: "/images/casual.png" },
-  { id: "street", label: "스트릿", img: "/images/street.png" },
-  { id: "lovely", label: "러블리", img: "/images/lovely.png" },
-  { id: "formal", label: "포멀", img: "/images/formal.png" },
+  { id: "casual", label: "캐주얼", img: "/images/casual.jpg" },
+  { id: "street", label: "스트릿", img: "/images/street.jpg" },
+  { id: "lovely", label: "러블리", img: "/images/lovely.jpg" },
+  { id: "formal", label: "포멀", img: "/images/formal.jpg" },
 ];
 
 function UserPage() {

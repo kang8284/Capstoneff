@@ -107,12 +107,7 @@ function ResultPage2() {
 
         {/* 버튼 */}
         <div className="flex justify-center gap-4 mt-6">
-          <button
-            onClick={handleBack}
-            className="w-40 h-12 rounded-full bg-white/70 text-gray-700 font-extrabold shadow-md hover:scale-105 transition"
-          >
-            되돌아가기
-          </button>
+          
 
           <button
             onClick={handleRestart}
