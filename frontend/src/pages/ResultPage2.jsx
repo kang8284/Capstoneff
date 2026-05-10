@@ -1,124 +1,236 @@
-import { useNavigate } from "react-router-dom";
+import { useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 
-const mockResult = {
-  fittingImage: "/images/sample-fitting.png",
-  outfits: [
-    { id: 1, title: "코디 1", image: "/images/outfit1.png" },
-    { id: 2, title: "코디 2", image: "/images/outfit2.png" },
-    { id: 3, title: "코디 3", image: "/images/outfit3.png" },
-  ],
-  bodyComment:
-    "분석 결과 상체와 하체의 균형이 좋은 체형입니다. 전체적으로 깔끔한 실루엣의 옷이 잘 어울립니다.",
-  outfitComment:
-    "너무 타이트한 핏보다는 자연스럽게 떨어지는 핏을 추천합니다. 상의와 하의의 색상 대비를 활용하면 체형 비율이 더 좋아 보입니다.",
-};
+const outfitSets = [
+    {
+        title: '캐주얼',
+        image: '/images/outfit1.png',
+        desc: '깔끔한 기본 아이템 중심의 코디입니다. 내추럴 체형의 자연스러운 골격감을 살리면서도 단정한 분위기를 만들어줍니다.',
+    },
+    {
+        title: '스트릿',
+        image: '/images/outfit2.png',
+        desc: '여유 있는 실루엣과 스트릿 무드를 살린 코디입니다. 상체는 편안하게, 하체는 길어 보이도록 균형을 잡아줍니다.',
+    },
+    {
+        title: '러블리',
+        image: '/images/outfit3.png',
+        desc: '정돈된 라인과 차분한 색감이 중심인 코디입니다. 깔끔한 인상과 안정적인 비율감을 함께 보여주기 좋습니다.',
+    },
+];
 
 function ResultPage2() {
-  const navigate = useNavigate();
+    const navigate = useNavigate();
+    const { state } = useLocation();
 
-  const handleRestart = () => {
-    navigate("/");
-  };
+    const [selectedOutfit, setSelectedOutfit] = useState(null);
 
-  const handleBack = () => {
-    navigate("/camera");
-  };
+    const style = state?.style;
+    const fittingImage = state?.fittingImage || '/images/sample-fitting.png';
 
-  return (
-    <div className="min-h-screen w-full bg-gradient-to-br from-emerald-200 via-violet-100 to-cyan-100 flex items-center justify-center p-6 relative overflow-hidden">
-      <div className="absolute left-[-60px] bottom-[-40px] w-52 h-52 rounded-full bg-emerald-300/40 blur-xl" />
-      <div className="absolute right-[-50px] top-[-50px] w-56 h-56 rounded-full bg-purple-300/40 blur-xl" />
+    return (
+        <div className="min-h-screen w-full bg-gradient-to-br from-emerald-200 via-violet-100 to-cyan-100 px-6 py-6 flex items-center justify-center">
+            <div className="w-full max-w-[1320px] rounded-[28px] bg-white/65 backdrop-blur-md shadow-2xl p-6">
+                <h1 className="text-center text-3xl font-extrabold text-gray-900 mb-7">
+                    체형 분석 기반 코디 추천 결과
+                </h1>
 
-      <div className="w-full max-w-6xl z-10">
-        <h1 className="text-3xl font-extrabold text-center text-gray-900 mb-6">
-          AI 체형 분석 결과
-        </h1>
+                <div className="grid grid-cols-1 lg:grid-cols-[1.15fr_2.7fr_1.45fr] gap-5">
+                    {/* 왼쪽: 가상피팅 결과 */}
+                    <div className="rounded-2xl bg-gradient-to-br from-pink-100/80 to-purple-100/80 shadow-md p-4 flex flex-col items-center justify-center min-h-[560px]">
+                        <h2 className="text-xl font-extrabold text-gray-900 mb-4">Best Style</h2>
 
-        <div className="grid grid-cols-1 lg:grid-cols-[1.15fr_1fr] gap-6">
-          {/* 왼쪽: 가상피팅 */}
-          <div className="rounded-3xl bg-white/60 backdrop-blur-md shadow-xl p-5">
-            <h2 className="text-xl font-extrabold text-gray-800 mb-4">
-              BEST 가상 피팅
-            </h2>
+                        <div className="w-full h-[500px] rounded-2xl bg-white/75 flex items-center justify-center overflow-hidden shadow-inner">
+                            <img
+                                src={fittingImage}
+                                alt="가상피팅 결과 이미지"
+                                className="h-full w-full object-contain"
+                            />
+                        </div>
+                    </div>
 
-            <div className="h-[480px] rounded-2xl bg-white/70 flex items-center justify-center overflow-hidden">
-              <img
-                src={mockResult.fittingImage}
-                alt="가상피팅 결과"
-                className="h-full object-contain"
-              />
-            </div>
-          </div>
+                    {/* 가운데: 신체 분석 */}
+                    <div className="rounded-2xl bg-gradient-to-br from-indigo-100/80 to-cyan-100/70 shadow-md p-6 min-h-[560px]">
+                        <div className="flex gap-7 h-full">
+                            <div className="flex justify-center items-center">
+                                <div className="relative w-[240px] h-[500px] flex items-center justify-center">
+                                    <div className="absolute top-0 left-3 px-4 py-1 rounded-full bg-indigo-300 text-white font-extrabold shadow">
+                                        BODY MAP
+                                    </div>
 
-          {/* 오른쪽: 추가 코디 3개 */}
-          <div className="rounded-3xl bg-white/60 backdrop-blur-md shadow-xl p-5">
-            <h2 className="text-xl font-extrabold text-gray-800 mb-4">
-              추가 추천 코디
-            </h2>
+                                    <svg
+                                        width="235"
+                                        height="470"
+                                        viewBox="0 0 220 420"
+                                        fill="none"
+                                        className="drop-shadow-[0_0_16px_rgba(168,85,247,0.8)] mt-8"
+                                    >
+                                        <path
+                                            d="M110 80 C130 80 145 63 145 43 C145 23 130 8 110 8 C90 8 75 23 75 43 C75 63 90 80 110 80Z"
+                                            fill="rgba(216,180,254,0.22)"
+                                            stroke="#d8b4fe"
+                                            strokeWidth="4"
+                                        />
+                                        <path
+                                            d="M78 95 L55 170 L45 265 L62 270 L82 178 L88 360 L104 390 L116 390 L132 360 L138 178 L158 270 L175 265 L165 170 L142 95 Z"
+                                            fill="rgba(216,180,254,0.18)"
+                                            stroke="#d8b4fe"
+                                            strokeWidth="5"
+                                            strokeLinejoin="round"
+                                        />
+                                        <line x1="110" y1="82" x2="110" y2="360" stroke="#a78bfa" strokeWidth="3" />
+                                        <line x1="78" y1="115" x2="142" y2="115" stroke="#a78bfa" strokeWidth="3" />
+                                        <line x1="88" y1="190" x2="132" y2="190" stroke="#a78bfa" strokeWidth="3" />
+                                        <line x1="88" y1="360" x2="132" y2="360" stroke="#a78bfa" strokeWidth="3" />
 
-            <div className="grid grid-cols-1 gap-4">
-              {mockResult.outfits.map((outfit) => (
-                <div
-                  key={outfit.id}
-                  className="h-[145px] rounded-2xl bg-white/70 shadow-md flex items-center gap-4 p-4"
-                >
-                  <div className="w-32 h-full rounded-xl bg-gray-100 flex items-center justify-center overflow-hidden">
-                    <img
-                      src={outfit.image}
-                      alt={outfit.title}
-                      className="h-full object-contain"
-                    />
-                  </div>
+                                        {[110, 78, 142, 88, 132, 62, 158].map((x, idx) => (
+                                            <circle
+                                                key={idx}
+                                                cx={x}
+                                                cy={[82, 115, 115, 190, 190, 265, 265][idx]}
+                                                r="5"
+                                                fill="#a78bfa"
+                                            />
+                                        ))}
+                                    </svg>
+                                </div>
+                            </div>
 
-                  <div>
-                    <h3 className="text-lg font-extrabold text-gray-800">
-                      {outfit.title}
-                    </h3>
-                    <p className="text-sm text-gray-500 mt-1">
-                      체형과 선택한 스타일을 반영한 추천 코디입니다.
-                    </p>
-                  </div>
+                            <div className="flex-1 pt-6">
+                                <h2 className="text-3xl font-extrabold text-gray-900 mb-6 leading-snug">
+                                    당신의 Body 타입은
+                                    <br />
+                                    <span className="text-purple-600">내추럴</span>입니다
+                                </h2>
+
+                                <div className="space-y-5 text-gray-900">
+                                    <section className="rounded-2xl bg-white/55 p-4 shadow-sm">
+                                        <h3 className="text-xl font-extrabold mb-2">숄더 라인 및 상체 분석:</h3>
+                                        <p className="text-base leading-relaxed font-semibold">
+                                            어깨선과 상체 비율이 안정적으로 보이며, 전체적으로 깔끔한 실루엣을 만들기
+                                            좋은 체형입니다. 상의는 너무 달라붙는 핏보다 자연스럽게 떨어지는 핏이 잘
+                                            어울립니다.
+                                        </p>
+                                    </section>
+
+                                    <section className="rounded-2xl bg-white/55 p-4 shadow-sm">
+                                        <h3 className="text-xl font-extrabold mb-2">하체 및 비율 분석:</h3>
+                                        <p className="text-base leading-relaxed font-semibold">
+                                            하체 라인이 비교적 곧게 보여 스트레이트 팬츠나 와이드 팬츠처럼 세로선을
+                                            살리는 아이템이 좋습니다.
+                                        </p>
+                                    </section>
+
+                                    <section className="rounded-2xl bg-white/55 p-4 shadow-sm">
+                                        <h3 className="text-xl font-extrabold mb-2">코디네이션 전략:</h3>
+                                        <p className="text-base leading-relaxed font-semibold">
+                                            선택한 선호 스타일인{' '}
+                                            <span className="text-purple-600">{style || '캐주얼'}</span>을 기반으로,
+                                            상체는 깔끔하게 정리하고 하체는 비율을 길게 보이게 하는 조합을 추천합니다.
+                                        </p>
+                                    </section>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* 오른쪽: 다른 스타일 추천 */}
+                    <div className="relative rounded-2xl bg-gradient-to-br from-violet-100/80 to-emerald-100/70 shadow-md p-4 min-h-[560px] overflow-hidden">
+                        <h2 className="text-lg font-extrabold text-center text-gray-900 mb-4">OTHER STYLES</h2>
+
+                        {!selectedOutfit ? (
+                            <div className="flex flex-col gap-4 transition-all duration-500">
+                                {outfitSets.map((set) => (
+                                    <button
+                                        key={set.title}
+                                        onClick={() => setSelectedOutfit(set)}
+                                        className="rounded-2xl bg-white/70 shadow-md p-3 hover:scale-[1.03] transition duration-300 text-left"
+                                    >
+                                        <h3 className="text-center text-sm font-extrabold text-gray-900 mb-2">
+                                            [{set.title}]
+                                        </h3>
+
+                                        <div className="h-[125px] rounded-xl bg-white/80 flex items-center justify-center overflow-hidden shadow-inner">
+                                            <img
+                                                src={set.image}
+                                                alt={set.title}
+                                                className="h-full w-full object-contain"
+                                            />
+                                        </div>
+                                    </button>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="animate-[scaleIn_0.45s_ease-out] rounded-2xl bg-white/90 shadow-xl p-4 min-h-[500px] flex flex-col">
+                                <div className="flex justify-between items-center mb-3">
+                                    <h3 className="text-base font-extrabold text-gray-900">[{selectedOutfit.title}]</h3>
+
+                                    <button
+                                        onClick={() => setSelectedOutfit(null)}
+                                        className="w-8 h-8 rounded-full bg-gray-200 text-xl font-extrabold hover:bg-gray-300"
+                                    >
+                                        ×
+                                    </button>
+                                </div>
+
+                                <div className="h-[210px] rounded-2xl bg-gradient-to-br from-purple-100 to-cyan-100 flex items-center justify-center overflow-hidden shadow-inner mb-4">
+                                    <img
+                                        src={selectedOutfit.image}
+                                        alt={selectedOutfit.title}
+                                        className="h-full w-full object-contain"
+                                    />
+                                </div>
+
+                                <div className="flex-1 rounded-2xl bg-gradient-to-br from-emerald-100/80 to-violet-100/80 p-4">
+                                    <h4 className="text-lg font-extrabold text-gray-900 mb-3">스타일 설명</h4>
+
+                                    <p className="text-base leading-relaxed font-semibold text-gray-800">
+                                        {selectedOutfit.desc}
+                                    </p>
+
+                                    <div className="flex flex-wrap gap-2 mt-5">
+                                        <span className="px-3 py-1 rounded-full bg-white/80 text-purple-600 font-bold">
+                                            #체형보완
+                                        </span>
+                                        <span className="px-3 py-1 rounded-full bg-white/80 text-purple-600 font-bold">
+                                            #비율보정
+                                        </span>
+                                        <span className="px-3 py-1 rounded-full bg-white/80 text-purple-600 font-bold">
+                                            #추천코디
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
                 </div>
-              ))}
+
+                <style>
+                    {`
+            @keyframes scaleIn {
+              0% {
+                opacity: 0;
+                transform: scale(0.85) translateY(20px);
+              }
+              100% {
+                opacity: 1;
+                transform: scale(1) translateY(0);
+              }
+            }
+          `}
+                </style>
+
+                <div className="flex justify-center mt-6">
+                    <button
+                        onClick={() => navigate('/')}
+                        className="w-[300px] h-14 rounded-full bg-gradient-to-r from-purple-400 to-indigo-400 text-white text-xl font-extrabold shadow-lg hover:scale-105 transition"
+                    >
+                        ← 처음으로 돌아가기
+                    </button>
+                </div>
             </div>
-          </div>
         </div>
-
-        {/* 아래 코멘트 */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
-          <div className="rounded-3xl bg-white/65 backdrop-blur-md shadow-xl p-6">
-            <h2 className="text-lg font-extrabold text-gray-800 mb-3">
-              체형 분석 코멘트
-            </h2>
-            <p className="text-gray-700 leading-relaxed">
-              {mockResult.bodyComment}
-            </p>
-          </div>
-
-          <div className="rounded-3xl bg-white/65 backdrop-blur-md shadow-xl p-6">
-            <h2 className="text-lg font-extrabold text-gray-800 mb-3">
-              코디 추천 코멘트
-            </h2>
-            <p className="text-gray-700 leading-relaxed">
-              {mockResult.outfitComment}
-            </p>
-          </div>
-        </div>
-
-        {/* 버튼 */}
-        <div className="flex justify-center gap-4 mt-6">
-          
-
-          <button
-            onClick={handleRestart}
-            className="w-40 h-12 rounded-full bg-gradient-to-r from-purple-400 to-indigo-400 text-white font-extrabold shadow-md hover:scale-105 transition"
-          >
-            종료하기
-          </button>
-        </div>
-      </div>
-    </div>
-  );
+    );
 }
 
 export default ResultPage2;

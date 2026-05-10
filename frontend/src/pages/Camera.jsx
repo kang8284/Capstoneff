@@ -1,169 +1,133 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+
+const styles = [
+    {
+        id: 'casual',
+        label: '캐주얼',
+        img: '/images/casual.jpg',
+        tags: ['#꾸안꾸', '#데일리룩', '#편안함', '#트렌디'],
+        desc: '일상에서 가장 자연스럽게 입기 좋은 편안한 스타일',
+    },
+    {
+        id: 'street',
+        label: '스트릿',
+        img: '/images/street.jpg',
+        tags: ['#힙한', '#오버핏', '#개성', '#유니크'],
+        desc: '자유롭고 개성 있는 분위기를 강조하는 스타일',
+    },
+    {
+        id: 'lovely',
+        label: '러블리',
+        img: '/images/lovely.jpg',
+        tags: ['#데이트룩', '#페미닌', '#부드러운', '#화사한'],
+        desc: '부드럽고 사랑스러운 이미지를 살리는 스타일',
+    },
+    {
+        id: 'formal',
+        label: '포멀',
+        img: '/images/formal.jpg',
+        tags: ['#자유로운', '#빈티지', '#내추럴', '#감성룩'],
+        desc: '자연스럽고 여유로운 분위기를 담은 스타일',
+    },
+];
 
 function Camera() {
-  const navigate = useNavigate();
+    const navigate = useNavigate();
+    const location = useLocation();
 
-  const [capturedImage, setCapturedImage] = useState(null);
-  const [countdown, setCountdown] = useState(null);
-  const [isCounting, setIsCounting] = useState(false);
+    const userData = location.state;
+    const [selectedStyle, setSelectedStyle] = useState(null);
 
-  const handleCapture = () => {
-    if (isCounting) return;
+    const handleSelect = (styleId) => {
+        setSelectedStyle((prev) => (prev === styleId ? null : styleId));
+    };
 
-    setCapturedImage(null);
-    setIsCounting(true);
-    setCountdown(3);
+    const handleResult = () => {
+        if (!userData) {
+            navigate('/input');
+            return;
+        }
 
-    let count = 3;
+        if (!selectedStyle) {
+            alert('선호 스타일을 선택해주세요.');
+            return;
+        }
 
-    const timer = setInterval(() => {
-      count -= 1;
+        navigate('/result', {
+            state: {
+                ...userData,
+                style: selectedStyle,
+            },
+        });
+    };
 
-      if (count > 0) {
-        setCountdown(count);
-      } else {
-        clearInterval(timer);
-        setCountdown(null);
-        setIsCounting(false);
+    return (
+        <div className="min-h-screen w-full overflow-hidden bg-gradient-to-br from-emerald-200 via-violet-100 to-cyan-100 flex items-center justify-center px-6 py-10 relative">
+            <div className="w-full max-w-[1050px]">
+                <h1 className="text-center text-4xl font-extrabold text-gray-900 mb-10">선호 스타일 선택</h1>
 
-        // 지금은 더미 이미지로 촬영 대체
-        setCapturedImage("/images/sample-person.jpg");
-      }
-    }, 1000);
-  };
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+                    {styles.map((item) => {
+                        const isOpen = selectedStyle === item.id;
 
-  const handleResult = () => {
-    navigate("/result", {
-      state: {
-        image: capturedImage,
-      },
-    });
-  };
+                        return (
+                            <div key={item.id} className="flex flex-col items-center">
+                                <button
+                                    onClick={() => handleSelect(item.id)}
+                                    className={`w-full h-20 rounded-full text-2xl font-extrabold text-white shadow-lg transition-all duration-300 ${
+                                        isOpen
+                                            ? 'bg-gradient-to-r from-pink-500 to-purple-500 scale-105'
+                                            : 'bg-gradient-to-r from-purple-400 to-indigo-400 hover:scale-105'
+                                    }`}
+                                >
+                                    {item.label}
+                                </button>
 
-  return (
-    <div className="min-h-screen w-full bg-gradient-to-br from-emerald-200 via-violet-100 to-cyan-100 flex items-center justify-center p-6">
-      <div className="w-full max-w-6xl grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* 왼쪽: 촬영 화면 */}
-        <div className="relative bg-white/50 backdrop-blur-md rounded-2xl shadow-lg overflow-hidden flex items-center justify-center h-[500px]">
-          <img
-            src="/images/sample-person.jpg"
-            alt="camera"
-            className="h-full object-contain"
-          />
+                                <div
+                                    className={`w-full mt-4 overflow-hidden transition-all duration-500 ${
+                                        isOpen ? 'max-h-[420px] opacity-100' : 'max-h-0 opacity-0'
+                                    }`}
+                                >
+                                    <div className="rounded-[32px] bg-white/65 backdrop-blur-md shadow-xl p-5">
+                                        <div className="h-52 rounded-3xl bg-white/70 overflow-hidden flex items-center justify-center mb-4">
+                                            <img
+                                                src={item.img}
+                                                alt={item.label}
+                                                className="h-full w-full object-contain"
+                                            />
+                                        </div>
 
-          {/* 가이드 라인 */}
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-  <svg
-    width="230"
-    height="420"
-    viewBox="0 0 220 420"
-    fill="none"
-    stroke="#22c55e"
-    strokeWidth="8"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className="opacity-80 drop-shadow-[0_0_10px_#4ade80]"
-  >
-    {/* 머리 */}
-    <circle cx="110" cy="45" r="34" />
+                                        <p className="text-center text-gray-700 font-semibold mb-4">{item.desc}</p>
 
-    {/* 몸통 + 팔 + 다리 외곽선 */}
-    <path
-      d="
-        M82 95
-        C65 95 52 108 52 125
-        L52 235
-        C52 250 63 260 77 260
-        C82 260 85 257 85 252
-        L85 135
+                                        <div className="flex flex-wrap justify-center gap-2">
+                                            {item.tags.map((tag) => (
+                                                <span
+                                                    key={tag}
+                                                    className="px-3 py-1 rounded-full bg-purple-100 text-purple-700 text-sm font-bold"
+                                                >
+                                                    {tag}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
 
-        L85 365
-        C85 385 98 398 110 398
-        C122 398 135 385 135 365
-        L135 135
-
-        L135 252
-        C135 257 138 260 143 260
-        C157 260 168 250 168 235
-        L168 125
-        C168 108 155 95 138 95
-        Z
-      "
-    />
-
-    {/* 다리 사이 구분선 */}
-    <line x1="110" y1="235" x2="110" y2="385" />
-  </svg>
-</div>
-
-          {/* 카운트다운 표시 */}
-          {countdown && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black/20">
-              <div className="w-32 h-32 rounded-full bg-white/80 flex items-center justify-center shadow-2xl">
-                <span className="text-6xl font-extrabold text-purple-500">
-                  {countdown}
-                </span>
-              </div>
+                <div className="flex justify-center mt-10">
+                    <button
+                        onClick={handleResult}
+                        className="w-[320px] h-14 rounded-full bg-gradient-to-r from-purple-400 to-indigo-400 text-white text-xl font-extrabold shadow-lg hover:scale-105 transition"
+                    >
+                        결과 보기
+                    </button>
+                </div>
             </div>
-          )}
         </div>
-
-        {/* 오른쪽: 결과 미리보기 */}
-        <div className="bg-white/50 backdrop-blur-md rounded-2xl shadow-lg p-4 flex flex-col justify-between h-[500px]">
-          <div className="flex-1 flex items-center justify-center bg-white/60 rounded-xl overflow-hidden">
-            {capturedImage ? (
-              <img
-                src={capturedImage}
-                alt="result"
-                className="h-full object-contain"
-              />
-            ) : (
-              <p className="text-gray-400">
-                {isCounting
-                  ? "촬영 준비 중입니다..."
-                  : "촬영된 이미지가 여기에 표시됩니다"}
-              </p>
-            )}
-          </div>
-
-          <div className="flex gap-3 mt-4">
-            <button
-              onClick={handleCapture}
-              disabled={isCounting}
-              className={`flex-1 h-12 rounded-full text-white font-bold shadow-md ${
-                isCounting
-                  ? "bg-gray-300"
-                  : "bg-gradient-to-r from-purple-400 to-indigo-400"
-              }`}
-            >
-              {isCounting ? "WAIT" : "CAPTURE"}
-            </button>
-
-            <button
-              onClick={() => setCapturedImage(null)}
-              disabled={isCounting}
-              className="flex-1 h-12 rounded-full bg-gray-200 font-bold"
-            >
-              RETRY
-            </button>
-
-            <button
-              onClick={handleResult}
-              disabled={!capturedImage || isCounting}
-              className={`flex-1 h-12 rounded-full font-bold text-white shadow-md ${
-                capturedImage && !isCounting
-                  ? "bg-gradient-to-r from-green-400 to-emerald-400"
-                  : "bg-gray-300"
-              }`}
-            >
-              RESULT
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+    );
 }
 
 export default Camera;
