@@ -487,6 +487,70 @@ app.get('/api/fitting/:jobId', (req, res) => {
 });
 
 /* =========================
+   4. 간편 가상 피팅 API
+   - JSON으로 base64 인물 이미지 수신
+   - MongoDB에서 테스트 룩 자동 선택
+   - Replicate IDM-VTON으로 피팅
+========================= */
+app.post('/api/fitting-simple', async (req, res) => {
+    const { personImage, gender = '남자' } = req.body;
+    if (!personImage) return res.status(400).json({ error: '인물 이미지 필요' });
+
+    // MongoDB에서 테스트 상의 1개 선택
+    const outfit = await Outfit.findOne({ gender, category: 'top' }).catch(() => null);
+    if (!outfit?.imageUrl) {
+        return res.status(404).json({ error: `DB에 ${gender} 상의 데이터 없음` });
+    }
+
+    const jobId = Date.now().toString();
+    fittingJobs.set(jobId, {
+        status: 'processing',
+        steps: [{ key: 'top', label: '상의', status: 'pending', viton: true }],
+        resultUrl: null,
+        outfitName: outfit.name,
+        outfitImageUrl: outfit.imageUrl,
+        currentStep: '시작 중...',
+        error: null,
+        mock: false,
+    });
+
+    res.json({ jobId, outfitName: outfit.name, outfitImageUrl: outfit.imageUrl });
+
+    (async () => {
+        const job = fittingJobs.get(jobId);
+        const token = process.env.REPLICATE_API_TOKEN;
+        try {
+            job.currentStep = '인물 사진 업로드 중...';
+            const uploadResult = await cloudinary.uploader.upload(personImage, { folder: 'fitting' });
+            const personUrl = uploadResult.secure_url;
+
+            job.steps[0].status = 'processing';
+            job.currentStep = '상의 피팅 중...';
+
+            if (token) {
+                const resultUrl = await runReplicate(personUrl, outfit.imageUrl, 'upper_body', token);
+                job.steps[0].resultUrl = resultUrl;
+                job.resultUrl = resultUrl;
+            } else {
+                // 토큰 없으면 의상 이미지 그대로 반환 (mock)
+                job.steps[0].resultUrl = outfit.imageUrl;
+                job.resultUrl = outfit.imageUrl;
+                job.mock = true;
+            }
+
+            job.steps[0].status = 'done';
+            job.status = 'done';
+            job.currentStep = '완료';
+        } catch (err) {
+            job.status = 'failed';
+            job.error = err.message;
+            job.currentStep = '오류 발생';
+            console.error('[fitting-simple 오류]', err.message);
+        }
+    })().catch(console.error);
+});
+
+/* =========================
    서버 실행
 ========================= */
 app.listen(3000, () => {

@@ -386,22 +386,48 @@ function AnalyzingPage() {
         if (IS_DEV) log('오버레이 이미지 생성 완료');
       }
 
-      // 추천 API
-      if (IS_DEV) log('추천 API 호출중...');
-      const recRes = await fetch('http://localhost:3000/api/recommend', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          gender:   userData.gender,
-          style:    userData.style,
-          bodyType: KR[primaryType],
-        }),
-      });
-      const recommendation = await recRes.json();
-      if (IS_DEV) log('추천 완료 → 결과 페이지 이동');
+      // 추천 API + 가상 피팅 동시 시작
+      if (IS_DEV) log('추천 API + 피팅 동시 호출중...');
+
+      const [recRes, fittingRes] = await Promise.allSettled([
+        fetch('http://localhost:3000/api/recommend', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            gender:   userData.gender,
+            style:    userData.style,
+            bodyType: KR[primaryType],
+          }),
+        }).then(r => r.json()),
+
+        fetch('http://localhost:3000/api/fitting-simple', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            personImage: photo,
+            gender: userData.gender,
+          }),
+        }).then(r => r.json()),
+      ]);
+
+      const recommendation = recRes.status === 'fulfilled' ? recRes.value : null;
+      const fittingInfo    = fittingRes.status === 'fulfilled' && !fittingRes.value.error
+        ? fittingRes.value
+        : null;
+
+      if (IS_DEV) {
+        log(`추천: ${recommendation ? 'OK' : 'FAIL'}`);
+        log(`피팅 시작: ${fittingInfo ? `jobId=${fittingInfo.jobId} outfit=${fittingInfo.outfitName}` : 'FAIL'}`);
+      }
 
       navigate('/body-result', {
-        state: { userData, scores, primary: primaryType, photo, overlayPhoto, recommendation },
+        state: {
+          userData, scores, primary: primaryType, photo, overlayPhoto,
+          recommendation,
+          fittingJobId:      fittingInfo?.jobId ?? null,
+          fittingOutfitName: fittingInfo?.outfitName ?? null,
+          fittingOutfitImg:  fittingInfo?.outfitImageUrl ?? null,
+        },
       });
 
     } catch (err) {
