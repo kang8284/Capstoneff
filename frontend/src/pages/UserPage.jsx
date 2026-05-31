@@ -92,11 +92,33 @@ function UserPage() {
     };
 
     const handleRetry = () => {
+        if (isCounting) return;
+
         setCapturedImage(null);
 
+        // 카메라가 꺼져있으면 다시 실행
         if (!streamRef.current) {
             startCamera();
         }
+
+        // 바로 다시 촬영 시작
+        setIsCounting(true);
+        setCountdown(3);
+
+        let count = 3;
+
+        const timer = setInterval(() => {
+            count -= 1;
+
+            if (count > 0) {
+                setCountdown(count);
+            } else {
+                clearInterval(timer);
+                setCountdown(null);
+                setIsCounting(false);
+                captureCurrentFrame();
+            }
+        }, 1000);
     };
 
     const handleNext = () => {

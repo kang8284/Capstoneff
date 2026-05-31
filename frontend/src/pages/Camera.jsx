@@ -32,6 +32,14 @@ const styles = [
     },
 ];
 
+const getSelectableStyles = (gender) => {
+    if (gender === 'male') {
+        return styles.filter((style) => style.id !== 'lovely');
+    }
+
+    return styles;
+};
+
 function Camera() {
     const navigate = useNavigate();
     const location = useLocation();
@@ -67,12 +75,18 @@ function Camera() {
             <div className="w-full max-w-[1050px]">
                 <h1 className="text-center text-4xl font-extrabold text-gray-900 mb-10">선호 스타일 선택</h1>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
-                    {styles.map((item) => {
+                <div
+                    className={
+                        userData?.gender === 'male'
+                            ? 'grid grid-cols-1 md:grid-cols-3 gap-6 justify-items-center'
+                            : 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6'
+                    }
+                >
+                    {getSelectableStyles(userData?.gender).map((item) => {
                         const isOpen = selectedStyle === item.id;
 
                         return (
-                            <div key={item.id} className="flex flex-col items-center">
+                            <div key={item.id} className="flex flex-col items-center w-full max-w-[260px] mx-auto">
                                 <button
                                     onClick={() => handleSelect(item.id)}
                                     className={`w-full h-20 rounded-full text-2xl font-extrabold text-white shadow-lg transition-all duration-300 ${

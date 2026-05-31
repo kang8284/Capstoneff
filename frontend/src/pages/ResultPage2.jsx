@@ -3,19 +3,28 @@ import { useLocation, useNavigate } from 'react-router-dom';
 
 const outfitSets = [
     {
+        id: 'casual',
         title: '캐주얼',
         image: '/images/outfit1.png',
         desc: '깔끔한 기본 아이템 중심의 코디입니다. 내추럴 체형의 자연스러운 골격감을 살리면서도 단정한 분위기를 만들어줍니다.',
     },
     {
+        id: 'street',
         title: '스트릿',
         image: '/images/outfit2.png',
         desc: '여유 있는 실루엣과 스트릿 무드를 살린 코디입니다. 상체는 편안하게, 하체는 길어 보이도록 균형을 잡아줍니다.',
     },
     {
+        id: 'lovely',
         title: '러블리',
         image: '/images/outfit3.png',
-        desc: '정돈된 라인과 차분한 색감이 중심인 코디입니다. 깔끔한 인상과 안정적인 비율감을 함께 보여주기 좋습니다.',
+        desc: '부드럽고 사랑스러운 분위기를 살린 코디입니다.',
+    },
+    {
+        id: 'formal',
+        title: '포멀',
+        image: '/images/outfit4.png',
+        desc: '단정하고 깔끔한 인상을 주는 코디입니다.',
     },
 ];
 
@@ -26,7 +35,16 @@ function ResultPage2() {
     const [selectedOutfit, setSelectedOutfit] = useState(null);
 
     const style = state?.style;
+    const gender = state?.gender;
     const fittingImage = state?.fittingImage || '/images/sample-fitting.png';
+
+    const otherOutfits = outfitSets.filter((outfit) => {
+        if (gender === 'male' && outfit.id === 'lovely') {
+            return false;
+        }
+
+        return outfit.id !== style;
+    });
 
     return (
         <div className="min-h-screen w-full bg-gradient-to-br from-emerald-200 via-violet-100 to-cyan-100 px-6 py-6 flex items-center justify-center">
@@ -36,7 +54,6 @@ function ResultPage2() {
                 </h1>
 
                 <div className="grid grid-cols-1 lg:grid-cols-[1.15fr_2.7fr_1.45fr] gap-5">
-                    {/* 왼쪽: 가상피팅 결과 */}
                     <div className="rounded-2xl bg-gradient-to-br from-pink-100/80 to-purple-100/80 shadow-md p-4 flex flex-col items-center justify-center min-h-[560px]">
                         <h2 className="text-xl font-extrabold text-gray-900 mb-4">Best Style</h2>
 
@@ -49,7 +66,6 @@ function ResultPage2() {
                         </div>
                     </div>
 
-                    {/* 가운데: 신체 분석 */}
                     <div className="rounded-2xl bg-gradient-to-br from-indigo-100/80 to-cyan-100/70 shadow-md p-6 min-h-[560px]">
                         <div className="flex gap-7 h-full">
                             <div className="flex justify-center items-center">
@@ -134,15 +150,14 @@ function ResultPage2() {
                         </div>
                     </div>
 
-                    {/* 오른쪽: 다른 스타일 추천 */}
                     <div className="relative rounded-2xl bg-gradient-to-br from-violet-100/80 to-emerald-100/70 shadow-md p-4 min-h-[560px] overflow-hidden">
                         <h2 className="text-lg font-extrabold text-center text-gray-900 mb-4">OTHER STYLES</h2>
 
                         {!selectedOutfit ? (
                             <div className="flex flex-col gap-4 transition-all duration-500">
-                                {outfitSets.map((set) => (
+                                {otherOutfits.map((set) => (
                                     <button
-                                        key={set.title}
+                                        key={set.id}
                                         onClick={() => setSelectedOutfit(set)}
                                         className="rounded-2xl bg-white/70 shadow-md p-3 hover:scale-[1.03] transition duration-300 text-left"
                                     >
