@@ -411,13 +411,19 @@ function AnalyzingPage() {
       ]);
 
       const recommendation = recRes.status === 'fulfilled' ? recRes.value : null;
-      const fittingInfo    = fittingRes.status === 'fulfilled' && !fittingRes.value.error
+      const fittingInfo    = fittingRes.status === 'fulfilled' && !fittingRes.value?.error
         ? fittingRes.value
         : null;
 
       if (IS_DEV) {
         log(`추천: ${recommendation ? 'OK' : 'FAIL'}`);
-        log(`피팅 시작: ${fittingInfo ? `jobId=${fittingInfo.jobId} outfit=${fittingInfo.outfitName}` : 'FAIL'}`);
+        if (fittingRes.status === 'rejected') {
+          log(`피팅 실패(네트워크): ${fittingRes.reason}`);
+        } else if (fittingRes.value?.error) {
+          log(`피팅 실패(서버): ${fittingRes.value.error}`);
+        } else {
+          log(`피팅 시작: jobId=${fittingInfo?.jobId} outfit=${fittingInfo?.outfitName}`);
+        }
       }
 
       navigate('/body-result', {
