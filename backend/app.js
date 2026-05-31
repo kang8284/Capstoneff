@@ -6,6 +6,7 @@ const cloudinary = require('./config/cloudinary');
 require('dotenv').config();
 
 const app = express();
+const { spawn } = require('child_process');
 
 app.use(cors());
 app.use(express.json());
@@ -53,30 +54,42 @@ const upload = multer({ storage });
    사진 품질 검사 API
    현재는 mock, 나중에 실제 모델 연결
 ========================= */
-app.post('/api/check-quality', upload.single('image'), async (req, res) => {
-    try {
-        if (!req.file) {
-            return res.status(400).json({
-                success: false,
-                message: '검사할 이미지가 없습니다.',
-            });
-        }
+app.post(
+  '/api/check-quality',
+  upload.single('image'),
+  async (req, res) => {
 
-        res.json({
-            success: true,
-            quality: 'good',
-            message: '사진 품질 적합',
-            mock: true,
-            imageUrl: `http://localhost:3000/uploads/${req.file.filename}`,
-        });
-    } catch (err) {
-        console.error(err);
-
-        res.status(500).json({
-            success: false,
-            message: '사진 품질 검사 실패',
-        });
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: '이미지가 없습니다.'
+      });
     }
+
+    const python = spawn(
+      'python',
+      [
+        'quality_check.py',
+        req.file.path
+      ]
+    );
+
+    let result = '';
+
+    python.stdout.on('data', (data) => {
+      result += data.toString();
+    });
+
+    python.on('close', () => {
+
+      const qualityResult =
+        JSON.parse(result);
+
+      res.json({
+        success: true,
+        ...qualityResult
+      });
+    });
 });
 
 /* =========================
