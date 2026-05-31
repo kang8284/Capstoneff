@@ -264,9 +264,10 @@ function drawDebugOverlay(canvas, img, landmarks, segData, infoPanel) {
 function AnalyzingPage() {
   const { state }    = useLocation();
   const navigate     = useNavigate();
-  const ran          = useRef(false);
-  const debugCanvas  = useRef(null);
-  const [devLog, setDevLog] = useState([]);
+  const ran           = useRef(false);
+  const debugCanvas   = useRef(null);
+  const [devLog,      setDevLog]      = useState([]);
+  const [resultState, setResultState] = useState(null); // 분석 완료 후 세팅
 
   const log = (msg) => {
     const ts = new Date().toLocaleTimeString('ko-KR', { hour12: false });
@@ -422,14 +423,12 @@ function AnalyzingPage() {
         else log(`피팅 시작 OK — jobId=${fittingInfo?.jobId} outfit=${fittingInfo?.outfitName}`);
       }
 
-      navigate('/body-result', {
-        state: {
-          userData, scores, primary: primaryType, photo, overlayPhoto,
-          recommendation: recRes,
-          fittingJobId:      fittingInfo?.jobId ?? null,
-          fittingOutfitName: fittingInfo?.outfitName ?? null,
-          fittingOutfitImg:  fittingInfo?.outfitImageUrl ?? null,
-        },
+      setResultState({
+        userData, scores, primary: primaryType, photo, overlayPhoto,
+        recommendation: recRes,
+        fittingJobId:      fittingInfo?.jobId ?? null,
+        fittingOutfitName: fittingInfo?.outfitName ?? null,
+        fittingOutfitImg:  fittingInfo?.outfitImageUrl ?? null,
       });
 
     } catch (err) {
@@ -438,26 +437,48 @@ function AnalyzingPage() {
       const fittingResult = await fittingPromise;
       const fittingInfo   = fittingResult && !fittingResult.error ? fittingResult : null;
       if (IS_DEV) log(`catch — 피팅: ${fittingInfo ? `jobId=${fittingInfo.jobId}` : 'null'}`);
-      navigate('/body-result', {
-        state: {
-          userData,
-          scores:   { Straight: 34, Wave: 33, Natural: 33 },
-          primary:  'Straight',
-          photo,
-          overlayPhoto:      null,
-          recommendation:    null,
-          fittingJobId:      fittingInfo?.jobId ?? null,
-          fittingOutfitName: fittingInfo?.outfitName ?? null,
-          fittingOutfitImg:  fittingInfo?.outfitImageUrl ?? null,
-        },
+      setResultState({
+        userData,
+        scores:   { Straight: 34, Wave: 33, Natural: 33 },
+        primary:  'Straight',
+        photo,
+        overlayPhoto:      null,
+        recommendation:    null,
+        fittingJobId:      fittingInfo?.jobId ?? null,
+        fittingOutfitName: fittingInfo?.outfitName ?? null,
+        fittingOutfitImg:  fittingInfo?.outfitImageUrl ?? null,
       });
     }
   }
 
   return (
     <div style={{ textAlign: 'center', padding: '60px 20px' }}>
-      <h1>분석중...</h1>
-      <p>체형을 분석하고 있습니다. 잠시만 기다려 주세요.</p>
+      {resultState ? (
+        <>
+          <h1>분석 완료!</h1>
+          <p>결과를 확인할 준비가 됐습니다.</p>
+          <button
+            onClick={() => navigate('/body-result', { state: resultState })}
+            style={{
+              marginTop: 20,
+              padding: '14px 48px',
+              fontSize: 18,
+              background: '#2196f3',
+              color: '#fff',
+              border: 'none',
+              borderRadius: 8,
+              cursor: 'pointer',
+            }}
+          >
+            결과 보기
+          </button>
+        </>
+      ) : (
+        <>
+          <h1>분석중...</h1>
+          <p>체형을 분석하고 있습니다. 잠시만 기다려 주세요.</p>
+        </>
+      )}
 
       {/* 오버레이 생성용 숨김 캔버스 (항상 마운트) */}
       <canvas ref={debugCanvas} style={{ display: 'none' }} />
