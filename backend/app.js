@@ -328,6 +328,23 @@ async function uploadToCloudinary(filePath) {
     return result.secure_url;
 }
 
+async function runHuggingFace(personUrl, garmentUrl) {
+    const { Client } = await import('@gradio/client');
+    const client = await Client.connect('yisol/IDM-VTON');
+    const result = await client.predict('/tryon', {
+        dict:          { background: personUrl, layers: [], composite: null },
+        garm_img:      garmentUrl,
+        garment_des:   'upper_body',
+        is_checked:    true,
+        is_checked_crop: false,
+        denoise_steps: 30,
+        seed:          42,
+    });
+    const output = result?.data?.[0];
+    if (!output) throw new Error('HuggingFace 결과 없음');
+    return typeof output === 'string' ? output : output.url ?? output.path;
+}
+
 async function runReplicate(personUrl, garmentUrl, category, token) {
     const startRes = await fetch('https://api.replicate.com/v1/models/yisol/idm-vton/predictions', {
         method: 'POST',
@@ -526,25 +543,17 @@ app.post('/api/fitting-simple', async (req, res) => {
 
     (async () => {
         const job = fittingJobs.get(jobId);
-        const token = process.env.REPLICATE_API_TOKEN;
         try {
             job.currentStep = '인물 사진 업로드 중...';
             const uploadResult = await cloudinary.uploader.upload(personImage, { folder: 'fitting' });
             const personUrl = uploadResult.secure_url;
 
             job.steps[0].status = 'processing';
-            job.currentStep = '상의 피팅 중...';
+            job.currentStep = 'AI 피팅 처리 중... (30초~2분 소요)';
 
-            if (token) {
-                const resultUrl = await runReplicate(personUrl, outfit.imageUrl, 'upper_body', token);
-                job.steps[0].resultUrl = resultUrl;
-                job.resultUrl = resultUrl;
-            } else {
-                // 토큰 없으면 의상 이미지 그대로 반환 (mock)
-                job.steps[0].resultUrl = outfit.imageUrl;
-                job.resultUrl = outfit.imageUrl;
-                job.mock = true;
-            }
+            const resultUrl = await runHuggingFace(personUrl, outfit.imageUrl);
+            job.steps[0].resultUrl = resultUrl;
+            job.resultUrl = resultUrl;
 
             job.steps[0].status = 'done';
             job.status = 'done';
