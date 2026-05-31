@@ -97,14 +97,12 @@ function UserPage() {
                         : '사진 품질이 적합하지 않습니다.';
 
                 setQualityMessage(reasonText);
-                alert(`사진 품질 검사 실패\n\n${reasonText}`);
             }
         } catch (error) {
             console.error('사진 품질 검사 실패:', error);
             setQualityPassed(false);
             setCapturedImage(null);
             setQualityMessage('사진 품질 검사 중 오류가 발생했습니다.');
-            alert('사진 품질 검사 중 오류가 발생했습니다.');
         } finally {
             setIsUploading(false);
         }
@@ -214,7 +212,7 @@ function UserPage() {
         }
 
         if (!qualityPassed) {
-            alert('사진 품질 검사가 완료되지 않았습니다. 다시 촬영해주세요.');
+            setQualityMessage('사진 품질 검사가 완료되지 않았습니다. 다시 촬영해주세요.');
             return;
         }
 
@@ -297,45 +295,6 @@ function UserPage() {
                                         muted
                                         className="h-full w-full object-cover scale-x-[-1]"
                                     />
-
-                                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                                        <svg
-                                            width="140"
-                                            height="250"
-                                            viewBox="0 0 220 420"
-                                            fill="none"
-                                            stroke="#22c55e"
-                                            strokeWidth="8"
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                            className="opacity-80 drop-shadow-[0_0_10px_#4ade80]"
-                                        >
-                                            <circle cx="110" cy="45" r="34" />
-                                            <path
-                                                d="
-                          M82 95
-                          C65 95 52 108 52 125
-                          L52 235
-                          C52 250 63 260 77 260
-                          C82 260 85 257 85 252
-                          L85 135
-
-                          L85 365
-                          C85 385 98 398 110 398
-                          C122 398 135 385 135 365
-                          L135 135
-
-                          L135 252
-                          C135 257 138 260 143 260
-                          C157 260 168 250 168 235
-                          L168 125
-                          C168 108 155 95 138 95
-                          Z
-                        "
-                                            />
-                                            <line x1="110" y1="235" x2="110" y2="385" />
-                                        </svg>
-                                    </div>
 
                                     {countdown && (
                                         <div className="absolute inset-0 flex items-center justify-center bg-black/20">

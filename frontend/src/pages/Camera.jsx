@@ -56,6 +56,7 @@ function Camera() {
         const arr = dataUrl.split(',');
         const mime = arr[0].match(/:(.*?);/)[1];
         const bstr = atob(arr[1]);
+
         let n = bstr.length;
         const u8arr = new Uint8Array(n);
 
@@ -64,32 +65,6 @@ function Camera() {
         }
 
         return new File([u8arr], filename, { type: mime });
-    };
-
-    const imageUrlToFile = async (url, filename) => {
-        const response = await fetch(url);
-        const blob = await response.blob();
-
-        return new File([blob], filename, {
-            type: blob.type || 'image/jpeg',
-        });
-    };
-
-    const pollFittingJob = async (jobId) => {
-        while (true) {
-            const response = await fetch(`http://localhost:3000/api/fitting/${jobId}`);
-            const result = await response.json();
-
-            if (result.status === 'done') {
-                return result;
-            }
-
-            if (result.status === 'failed') {
-                throw new Error(result.error || '가상 피팅 실패');
-            }
-
-            await new Promise((resolve) => setTimeout(resolve, 3000));
-        }
     };
 
     const handleResult = async () => {
@@ -103,100 +78,48 @@ function Camera() {
             return;
         }
 
+        if (!userData.image) {
+            alert('촬영된 이미지가 없습니다. 다시 촬영해주세요.');
+            navigate('/input');
+            return;
+        }
+
         try {
             setIsLoading(true);
 
             const personFile = dataURLtoFile(userData.image, 'person.jpg');
 
-            const bodyFormData = new FormData();
-            bodyFormData.append('image', personFile);
-            bodyFormData.append('height', userData.height);
-            bodyFormData.append('weight', userData.weight);
-            bodyFormData.append('gender', userData.gender);
+            const formData = new FormData();
+            formData.append('image', personFile);
+            formData.append('height', userData.height);
+            formData.append('weight', userData.weight);
+            formData.append('gender', userData.gender);
+            formData.append('style', selectedStyle);
 
-            const bodyResponse = await fetch('http://localhost:3000/api/body-analysis', {
+            const response = await fetch('http://localhost:3000/api/body-analysis', {
                 method: 'POST',
-                body: bodyFormData,
+                body: formData,
             });
 
-            const bodyResult = await bodyResponse.json();
+            const result = await response.json();
 
-            if (!bodyResponse.ok || !bodyResult.success) {
-                throw new Error(bodyResult.message || '체형 분석 실패');
+            if (!response.ok || !result.success) {
+                throw new Error(result.message || '체형 분석 및 추천 실패');
             }
 
-            console.log('체형 분석 결과:', bodyResult);
-
-            const recommendResponse = await fetch('http://localhost:3000/api/recommend', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    gender: userData.gender,
-                    style: selectedStyle,
-                    bodyType: bodyResult.bodyType,
-                }),
-            });
-
-            const recommendResult = await recommendResponse.json();
-
-            if (!recommendResponse.ok) {
-                throw new Error(recommendResult.message || '추천 실패');
-            }
-
-            console.log('추천 결과:', recommendResult);
-
-            let fittingResult = null;
-
-            const topItem = recommendResult.top?.[0];
-            const bottomItem = recommendResult.bottom?.[0];
-            const outerItem = recommendResult.jacket?.[0];
-
-            if (topItem || bottomItem || outerItem) {
-                const fittingFormData = new FormData();
-                fittingFormData.append('person', personFile);
-
-                if (topItem?.imageUrl) {
-                    const topFile = await imageUrlToFile(topItem.imageUrl, 'top.jpg');
-                    fittingFormData.append('top', topFile);
-                }
-
-                if (bottomItem?.imageUrl) {
-                    const bottomFile = await imageUrlToFile(bottomItem.imageUrl, 'bottom.jpg');
-                    fittingFormData.append('bottom', bottomFile);
-                }
-
-                if (outerItem?.imageUrl) {
-                    const outerFile = await imageUrlToFile(outerItem.imageUrl, 'outer.jpg');
-                    fittingFormData.append('outer', outerFile);
-                }
-
-                const fittingResponse = await fetch('http://localhost:3000/api/fitting', {
-                    method: 'POST',
-                    body: fittingFormData,
-                });
-
-                const fittingStartResult = await fittingResponse.json();
-
-                if (!fittingResponse.ok) {
-                    throw new Error(fittingStartResult.error || '가상 피팅 시작 실패');
-                }
-
-                console.log('가상 피팅 시작:', fittingStartResult);
-
-                fittingResult = await pollFittingJob(fittingStartResult.jobId);
-
-                console.log('가상 피팅 완료:', fittingResult);
-            }
+            console.log('체형 분석 + 추천 결과:', result);
 
             navigate('/result', {
                 state: {
                     ...userData,
                     style: selectedStyle,
-                    bodyType: bodyResult.bodyType,
-                    recommend: recommendResult,
-                    fittingImage: fittingResult?.resultUrl || userData.image,
+
+                    bodyType: result.analysis?.bodyType,
+                    analysis: result.analysis,
+                    recommendation: result.recommendation,
+
+                    imageUrl: result.imageUrl,
+                    fittingImage: result.imageUrl || userData.image,
                 },
             });
         } catch (error) {
@@ -273,7 +196,9 @@ function Camera() {
                         onClick={handleResult}
                         disabled={isLoading}
                         className={`w-[320px] h-14 rounded-full text-white text-xl font-extrabold shadow-lg transition ${
-                            isLoading ? 'bg-gray-400' : 'bg-gradient-to-r from-purple-400 to-indigo-400 hover:scale-105'
+                            isLoading
+                                ? 'bg-gray-400 cursor-not-allowed'
+                                : 'bg-gradient-to-r from-purple-400 to-indigo-400 hover:scale-105'
                         }`}
                     >
                         {isLoading ? '결과 생성 중...' : '결과 보기'}

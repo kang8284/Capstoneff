@@ -31,12 +31,13 @@ const outfitSets = [
 function ResultPage2() {
     const navigate = useNavigate();
     const { state } = useLocation();
+    const bodyType = state?.bodyType || '분석 결과 없음';
 
     const [selectedOutfit, setSelectedOutfit] = useState(null);
 
     const style = state?.style;
     const gender = state?.gender;
-    const fittingImage = state?.fittingImage || '/images/sample-fitting.png';
+    const fittingImage = state?.fittingImage || state?.image || '';
 
     const otherOutfits = outfitSets.filter((outfit) => {
         if (gender === 'male' && outfit.id === 'lovely') {
@@ -116,7 +117,7 @@ function ResultPage2() {
                                 <h2 className="text-3xl font-extrabold text-gray-900 mb-6 leading-snug">
                                     당신의 Body 타입은
                                     <br />
-                                    <span className="text-purple-600">내추럴</span>입니다
+                                    <span className="text-purple-600">{bodyType}</span>입니다
                                 </h2>
 
                                 <div className="space-y-5 text-gray-900">
