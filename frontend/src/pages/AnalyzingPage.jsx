@@ -4,69 +4,201 @@ import { useLocation, useNavigate } from 'react-router-dom';
 const IS_DEV = import.meta.env.DEV;
 
 /* ──────────────────────────────────────────
-   체형 분석 유틸
+   성별별 Gaussian 파라미터 [mean, std]
 ────────────────────────────────────────── */
-function dist(a, b) {
-  return Math.sqrt((a.x - b.x) ** 2 + (a.y - b.y) ** 2);
-}
+const SHR_PARAMS = {
+  여자: { Straight: [0.97, 0.09], Natural: [1.09, 0.10], Wave: [0.84, 0.08] },
+  남자: { Straight: [1.12, 0.09], Natural: [1.28, 0.11], Wave: [0.97, 0.08] },
+};
+const HEIGHT_PARAMS = {
+  여자: { Straight: [165, 5], Natural: [169, 6], Wave: [161, 5] },
+  남자: { Straight: [175, 5], Natural: [179, 6], Wave: [172, 5] },
+};
+const RATIO_PARAMS = {
+  여자: { Straight: [0.65, 0.07], Natural: [0.72, 0.08], Wave: [0.60, 0.06] },
+  남자: { Straight: [0.68, 0.07], Natural: [0.75, 0.08], Wave: [0.63, 0.06] },
+};
+const TYPES = ['Straight', 'Wave', 'Natural'];
+const KR    = { Straight: '스트레이트', Wave: '웨이브', Natural: '내추럴' };
 
 function gaussian(x, mean, std) {
   return Math.exp(-0.5 * ((x - mean) / std) ** 2);
 }
 
-function calcBodyTypeScores(landmarks) {
-  const shoulderW = dist(landmarks[11], landmarks[12]);
-  const hipW      = dist(landmarks[23], landmarks[24]);
-  if (hipW < 0.001) return { Straight: 34, Wave: 33, Natural: 33 };
-
-  const shr = shoulderW / hipW;
-
-  const s = gaussian(shr, 1.00, 0.10);
-  const n = gaussian(shr, 1.20, 0.12);
-  const w = gaussian(shr, 0.85, 0.10);
-  const total = s + n + w;
-
-  const straightPct = Math.round((s / total) * 100);
-  const naturalPct  = Math.round((n / total) * 100);
-  const wavePct     = 100 - straightPct - naturalPct;
-
-  return { Straight: straightPct, Wave: wavePct, Natural: naturalPct };
+function dist(a, b) {
+  return Math.sqrt((a.x - b.x) ** 2 + (a.y - b.y) ** 2);
 }
 
-const KR = { Straight: '스트레이트', Wave: '웨이브', Natural: '내추럴' };
+/* ──────────────────────────────────────────
+   세그멘테이션 마스크에서 너비 측정
+   bustLevel: 0~1 (어깨에서 힙까지의 비율)
+────────────────────────────────────────── */
+function measureWidthAtY(maskArr, maskW, maskH, centerY, scanLines = 9) {
+  const half = Math.floor(scanLines / 2);
+  const widths = [];
+  for (let dy = -half; dy <= half; dy++) {
+    const y = centerY + dy;
+    if (y < 0 || y >= maskH) continue;
+    let left = -1, right = -1;
+    for (let x = 0; x < maskW; x++) {
+      if (maskArr[y * maskW + x] > 0.5) { if (left < 0) left = x; right = x; }
+    }
+    if (left >= 0 && right > left) widths.push((right - left) / maskW);
+  }
+  return widths.length ? widths.reduce((a, b) => a + b, 0) / widths.length : null;
+}
 
 /* ──────────────────────────────────────────
-   개발자용 스켈레톤 오버레이 드로잉
-   빨간 점: 측정 기준 (어깨·힙)
-   하늘색 점: 나머지 랜드마크
-   초록 선: 스켈레톤
-   노란 점선: 어깨 너비 / 힙 너비 측정선
+   단일 프레임 분석
+────────────────────────────────────────── */
+async function analyzeFrame(img, landmarker, segmenter) {
+  const lmResult  = landmarker.detect(img);
+  const segResult = segmenter.segment(img);
+
+  const landmarks = lmResult.landmarks?.[0] ?? null;
+  let segData = null;
+
+  // 세그멘테이션 마스크
+  if (segResult.confidenceMasks?.length > 0) {
+    const cm = segResult.confidenceMasks[0];
+    const arr = cm.getAsFloat32Array();
+    segData = { arr, width: cm.width, height: cm.height };
+    cm.close();
+  }
+
+  if (!landmarks) return { landmarks: null, shr: null, lmSHR: null, segSHR: null, bodyRatio: null, segData, visMap: {} };
+
+  // 가시성 체크
+  const visMap = {};
+  for (const idx of [11, 12, 23, 24, 27, 28]) {
+    visMap[idx] = landmarks[idx]?.visibility ?? 0;
+  }
+  const coreVisible = [11, 12, 23, 24].every(i => visMap[i] >= 0.5);
+  if (!coreVisible) return { landmarks, shr: null, lmSHR: null, segSHR: null, bodyRatio: null, segData, visMap };
+
+  // LM 기반 SHR
+  const lmSHR = dist(landmarks[11], landmarks[12]) / dist(landmarks[23], landmarks[24]);
+
+  // 세그멘테이션 기반 SHR (버스트 레벨 10-22%)
+  let segSHR = null;
+  if (segData) {
+    const { arr, width: mW, height: mH } = segData;
+    const shoulderY = (landmarks[11].y + landmarks[12].y) / 2;
+    const hipY      = (landmarks[23].y + landmarks[24].y) / 2;
+    const range     = hipY - shoulderY;
+
+    const bustCY = Math.round((shoulderY + range * 0.15) * mH);
+    const hipCY  = Math.round((hipY - range * 0.05)      * mH);
+
+    const bustW = measureWidthAtY(arr, mW, mH, bustCY);
+    const hipW  = measureWidthAtY(arr, mW, mH, hipCY);
+
+    if (bustW && hipW && bustW > 0.02 && hipW > 0.02) {
+      segSHR = bustW / hipW;
+    }
+  }
+
+  const shr = segSHR ?? lmSHR;
+
+  // 상하체 비율
+  let bodyRatio = null;
+  if (visMap[27] >= 0.3 && visMap[28] >= 0.3) {
+    const shoulderY = (landmarks[11].y + landmarks[12].y) / 2;
+    const hipY      = (landmarks[23].y + landmarks[24].y) / 2;
+    const ankleY    = (landmarks[27].y + landmarks[28].y) / 2;
+    const upper = hipY - shoulderY;
+    const lower = ankleY - hipY;
+    if (lower > 0.01) bodyRatio = upper / lower;
+  }
+
+  return { landmarks, shr, lmSHR, segSHR, bodyRatio, segData, visMap, usingSeg: segSHR !== null };
+}
+
+/* ──────────────────────────────────────────
+   가중 점수 계산
+────────────────────────────────────────── */
+function computeScores({ shr, height, bodyRatio, serverSHR, gender }) {
+  const g = (SHR_PARAMS[gender] ? gender : '여자');
+  const indicators = [];
+
+  if (shr != null)       indicators.push({ label: 'SHR',    vals: TYPES.map(t => gaussian(shr,       ...SHR_PARAMS[g][t])),   w: 0.40 });
+  if (serverSHR != null) indicators.push({ label: 'Server', vals: TYPES.map(t => gaussian(serverSHR, ...SHR_PARAMS[g][t])),   w: 0.20 });
+  if (height)            indicators.push({ label: 'Height', vals: TYPES.map(t => gaussian(height,    ...HEIGHT_PARAMS[g][t])), w: 0.20 });
+  if (bodyRatio != null) indicators.push({ label: 'Ratio',  vals: TYPES.map(t => gaussian(bodyRatio, ...RATIO_PARAMS[g][t])), w: 0.20 });
+
+  if (!indicators.length) return { Straight: 34, Wave: 33, Natural: 33 };
+
+  const totalW = indicators.reduce((s, i) => s + i.w, 0);
+  const raw = TYPES.map((_, ti) =>
+    indicators.reduce((s, ind) => s + ind.vals[ti] * (ind.w / totalW), 0)
+  );
+  const totalG = raw.reduce((a, b) => a + b, 0);
+  const pcts = raw.map(v => Math.round(v / totalG * 100));
+  pcts[2] = 100 - pcts[0] - pcts[1];
+
+  return Object.fromEntries(TYPES.map((t, i) => [t, pcts[i]]));
+}
+
+/* ──────────────────────────────────────────
+   서버 분석 (FastAPI)
+────────────────────────────────────────── */
+async function fetchServerAnalysis(photo, gender, height, weight) {
+  const base64 = photo.split(',')[1];
+  const res = await fetch('http://localhost:8000/api/analyze-body', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ image: base64, gender, height: Number(height), weight: Number(weight) }),
+  });
+  if (!res.ok) throw new Error(`Server ${res.status}`);
+  return await res.json();
+}
+
+/* ──────────────────────────────────────────
+   스켈레톤 + 디버그 오버레이 드로잉
 ────────────────────────────────────────── */
 const CONNECTIONS = [
-  [11, 12],            // 어깨
-  [11, 13], [13, 15],  // 왼쪽 팔
-  [12, 14], [14, 16],  // 오른쪽 팔
-  [11, 23], [12, 24],  // 몸통 옆선
-  [23, 24],            // 힙
-  [23, 25], [25, 27],  // 왼쪽 다리
-  [24, 26], [26, 28],  // 오른쪽 다리
+  [11, 12],
+  [11, 13], [13, 15],
+  [12, 14], [14, 16],
+  [11, 23], [12, 24],
+  [23, 24],
+  [23, 25], [25, 27],
+  [24, 26], [26, 28],
 ];
 const KEY_POINTS = new Set([11, 12, 23, 24]);
 
-function drawDebugOverlay(canvas, img, landmarks) {
+function drawDebugOverlay(canvas, img, landmarks, segData, infoPanel) {
   const W = img.naturalWidth || img.width;
   const H = img.naturalHeight || img.height;
   canvas.width  = W;
   canvas.height = H;
   const ctx = canvas.getContext('2d');
-
   ctx.drawImage(img, 0, 0);
+
+  // 세그멘테이션 마스크 (반투명 보라)
+  if (segData) {
+    const { arr, width: mW, height: mH } = segData;
+    const tmp = document.createElement('canvas');
+    tmp.width = mW; tmp.height = mH;
+    const tctx = tmp.getContext('2d');
+    const id = tctx.createImageData(mW, mH);
+    for (let i = 0; i < arr.length; i++) {
+      const conf = arr[i];
+      id.data[i * 4]     = 120;
+      id.data[i * 4 + 1] = 80;
+      id.data[i * 4 + 2] = 220;
+      id.data[i * 4 + 3] = conf > 0.5 ? Math.round(conf * 80) : 0;
+    }
+    tctx.putImageData(id, 0, 0);
+    ctx.drawImage(tmp, 0, 0, W, H);
+  }
 
   // 스켈레톤 연결선
   ctx.strokeStyle = 'rgba(0,255,80,0.85)';
   ctx.lineWidth   = Math.max(2, W * 0.003);
   for (const [a, b] of CONNECTIONS) {
     const la = landmarks[a], lb = landmarks[b];
+    if (!la || !lb) continue;
     ctx.beginPath();
     ctx.moveTo(la.x * W, la.y * H);
     ctx.lineTo(lb.x * W, lb.y * H);
@@ -76,50 +208,64 @@ function drawDebugOverlay(canvas, img, landmarks) {
   // 랜드마크 점
   for (let i = 0; i < landmarks.length; i++) {
     const lm = landmarks[i];
+    if (!lm) continue;
     const isKey = KEY_POINTS.has(i);
     ctx.fillStyle = isKey ? 'rgba(255,40,40,0.95)' : 'rgba(0,210,255,0.85)';
     ctx.beginPath();
-    ctx.arc(lm.x * W, lm.y * H, isKey ? W * 0.01 : W * 0.006, 0, Math.PI * 2);
+    ctx.arc(lm.x * W, lm.y * H, isKey ? W * 0.012 : W * 0.006, 0, Math.PI * 2);
     ctx.fill();
   }
 
-  // 어깨 측정선 (노란 점선)
-  ctx.strokeStyle = 'rgba(255,230,0,1)';
-  ctx.lineWidth   = Math.max(2, W * 0.004);
-  ctx.setLineDash([8, 6]);
+  // 어깨·힙 측정선
   const ls = landmarks[11], rs = landmarks[12];
-  ctx.beginPath();
-  ctx.moveTo(ls.x * W, ls.y * H);
-  ctx.lineTo(rs.x * W, rs.y * H);
-  ctx.stroke();
-
-  // 힙 측정선 (분홍 점선)
-  ctx.strokeStyle = 'rgba(255,100,200,1)';
   const lh = landmarks[23], rh = landmarks[24];
-  ctx.beginPath();
-  ctx.moveTo(lh.x * W, lh.y * H);
-  ctx.lineTo(rh.x * W, rh.y * H);
-  ctx.stroke();
+  ctx.setLineDash([8, 6]);
+  ctx.lineWidth = Math.max(2, W * 0.004);
+
+  ctx.strokeStyle = 'rgba(255,230,0,1)';
+  ctx.beginPath(); ctx.moveTo(ls.x * W, ls.y * H); ctx.lineTo(rs.x * W, rs.y * H); ctx.stroke();
+
+  ctx.strokeStyle = 'rgba(255,100,200,1)';
+  ctx.beginPath(); ctx.moveTo(lh.x * W, lh.y * H); ctx.lineTo(rh.x * W, rh.y * H); ctx.stroke();
 
   ctx.setLineDash([]);
 
   // 레이블
   const fs = Math.max(14, W * 0.022);
-  ctx.font      = `bold ${fs}px monospace`;
+  ctx.font = `bold ${fs}px monospace`;
   ctx.fillStyle = 'rgba(255,230,0,1)';
   ctx.fillText('← 어깨 →', ls.x * W + 6, ls.y * H - 8);
   ctx.fillStyle = 'rgba(255,100,200,1)';
   ctx.fillText('← 힙 →', lh.x * W + 6, lh.y * H + fs + 4);
+
+  // 정보 패널 (우측 상단)
+  if (infoPanel?.length) {
+    const lineH = Math.max(16, H * 0.028);
+    const panelW = Math.max(200, W * 0.38);
+    const panelH = infoPanel.length * lineH + 16;
+    const px = W - panelW - 10, py = 10;
+
+    ctx.fillStyle = 'rgba(0,0,0,0.65)';
+    ctx.beginPath();
+    ctx.roundRect(px, py, panelW, panelH, 6);
+    ctx.fill();
+
+    ctx.font = `bold ${Math.max(11, lineH * 0.72)}px monospace`;
+    ctx.fillStyle = '#00e676';
+    infoPanel.forEach((line, i) => {
+      ctx.fillText(line, px + 8, py + 10 + lineH * (i + 0.8));
+    });
+  }
 }
 
 /* ──────────────────────────────────────────
    컴포넌트
 ────────────────────────────────────────── */
 function AnalyzingPage() {
-  const { state } = useLocation();
-  const navigate  = useNavigate();
-  const ran        = useRef(false);
-  const debugCanvas = useRef(null);
+  const { state }    = useLocation();
+  const navigate     = useNavigate();
+  const ran          = useRef(false);
+  const debugCanvas  = useRef(null);
   const [devLog, setDevLog] = useState([]);
 
   const log = (msg) => {
@@ -131,70 +277,116 @@ function AnalyzingPage() {
     if (ran.current) return;
     ran.current = true;
     if (!state?.photo || !state?.userData) { navigate('/body-input'); return; }
-    runAnalysis(state.userData, state.photo);
+    runAnalysis(state.userData, state.photo, state.photos ?? [state.photo]);
   }, []);
 
-  async function runAnalysis(userData, photo) {
+  async function runAnalysis(userData, photo, photos) {
     try {
       if (IS_DEV) log('MediaPipe 모델 로딩 시작...');
 
-      const { PoseLandmarker, FilesetResolver } = await import('@mediapipe/tasks-vision');
+      const { PoseLandmarker, ImageSegmenter, FilesetResolver } = await import('@mediapipe/tasks-vision');
 
       const vision = await FilesetResolver.forVisionTasks(
         'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm'
       );
-      if (IS_DEV) log('WASM FilesetResolver 로드 완료');
+      if (IS_DEV) log('WASM 로드 완료');
 
-      const landmarker = await PoseLandmarker.createFromOptions(vision, {
-        baseOptions: {
-          modelAssetPath:
-            'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task',
-          delegate: 'GPU',
-        },
-        runningMode: 'IMAGE',
-        numPoses: 1,
-      });
-      if (IS_DEV) log('PoseLandmarker 모델 로드 완료');
+      const [landmarker, segmenter] = await Promise.all([
+        PoseLandmarker.createFromOptions(vision, {
+          baseOptions: {
+            modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_heavy/float16/1/pose_landmarker_heavy.task',
+            delegate: 'GPU',
+          },
+          runningMode: 'IMAGE',
+          numPoses: 1,
+        }),
+        ImageSegmenter.createFromOptions(vision, {
+          baseOptions: {
+            modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter/float16/latest/selfie_segmenter.tflite',
+            delegate: 'GPU',
+          },
+          runningMode: 'IMAGE',
+          outputConfidenceMasks: true,
+          outputCategoryMask: false,
+        }),
+      ]);
+      if (IS_DEV) log('모델 로드 완료 (heavy + segmenter)');
 
-      // 이미지 로드
-      const img = new Image();
-      img.src = photo;
-      await new Promise((res, rej) => { img.onload = res; img.onerror = rej; });
-      if (IS_DEV) log(`이미지 로드 완료 (${img.naturalWidth}×${img.naturalHeight})`);
-
-      // 포즈 감지
-      const result = landmarker.detect(img);
-      landmarker.close();
-
-      const detected = result.landmarks?.length > 0;
-      if (IS_DEV) log(detected
-        ? `포즈 감지 성공 — 랜드마크 ${result.landmarks[0].length}개 검출`
-        : '포즈 감지 실패 — fallback 값 사용');
-
-      // 스켈레톤 오버레이 그리기
-      if (IS_DEV && detected && debugCanvas.current) {
-        drawDebugOverlay(debugCanvas.current, img, result.landmarks[0]);
-        log('스켈레톤 오버레이 렌더링 완료');
+      // 멀티프레임 분석
+      const frames = [];
+      for (const src of photos) {
+        const img = new Image();
+        img.src = src;
+        await new Promise((res, rej) => { img.onload = res; img.onerror = rej; });
+        const result = await analyzeFrame(img, landmarker, segmenter);
+        frames.push({ result, img });
+        if (IS_DEV) log(`프레임 분석 — SHR: ${result.shr?.toFixed(3) ?? 'N/A'} | seg: ${result.usingSeg ? 'O' : 'X'}`);
       }
 
-      // 체형 점수 계산
-      const scores = detected
-        ? calcBodyTypeScores(result.landmarks[0])
-        : { Straight: 34, Wave: 33, Natural: 33 };
+      // 평균값 집계
+      const validSHR   = frames.map(f => f.result.shr).filter(v => v != null);
+      const validRatio = frames.map(f => f.result.bodyRatio).filter(v => v != null);
+      const avgSHR     = validSHR.length   ? validSHR.reduce((a, b) => a + b, 0) / validSHR.length   : null;
+      const avgRatio   = validRatio.length ? validRatio.reduce((a, b) => a + b, 0) / validRatio.length : null;
 
-      const primary = Object.entries(scores).sort((a, b) => b[1] - a[1])[0][0];
+      // 대표 프레임 (첫 번째, 오버레이용)
+      const { result: primary, img: primaryImg } = frames[0];
 
       if (IS_DEV) {
-        const shr = detected
-          ? (dist(result.landmarks[0][11], result.landmarks[0][12]) /
-             dist(result.landmarks[0][23], result.landmarks[0][24])).toFixed(3)
-          : 'N/A';
-        log(`어깨÷힙 비율(SHR): ${shr}`);
-        log(`Straight ${scores.Straight}%  Wave ${scores.Wave}%  Natural ${scores.Natural}%`);
-        log(`대표 체형: ${primary} (${KR[primary]})`);
+        log(`평균 SHR: ${avgSHR?.toFixed(3) ?? 'N/A'} | 평균 Ratio: ${avgRatio?.toFixed(3) ?? 'N/A'}`);
+        for (const [idx, vis] of Object.entries(primary.visMap)) {
+          log(`  lm[${idx}] vis: ${vis?.toFixed(2) ?? 'N/A'}`);
+        }
       }
 
-      // 추천 API 호출
+      // 서버 분석
+      let serverSHR = null;
+      try {
+        if (IS_DEV) log('서버 분석 요청중...');
+        const srv = await fetchServerAnalysis(photo, userData.gender, userData.height, userData.weight);
+        serverSHR = srv.shr ?? null;
+        if (IS_DEV) log(`서버 SHR: ${serverSHR?.toFixed(3) ?? 'N/A'} | ${srv.usedIndicators?.join(', ')}`);
+      } catch (e) {
+        if (IS_DEV) log(`서버 분석 실패 (무시): ${e.message}`);
+      }
+
+      landmarker.close();
+      segmenter.close();
+
+      // 점수 계산
+      const scores = computeScores({
+        shr:       avgSHR,
+        height:    Number(userData.height),
+        bodyRatio: avgRatio,
+        serverSHR,
+        gender:    userData.gender,
+      });
+      const primaryType = Object.entries(scores).sort((a, b) => b[1] - a[1])[0][0];
+
+      if (IS_DEV) {
+        log(`Straight ${scores.Straight}%  Wave ${scores.Wave}%  Natural ${scores.Natural}%`);
+        log(`대표 체형: ${primaryType} (${KR[primaryType]})`);
+      }
+
+      // 오버레이 이미지 생성
+      let overlayPhoto = null;
+      if (primary.landmarks && debugCanvas.current) {
+        const infoPanel = [
+          `SHR: ${avgSHR?.toFixed(3) ?? 'N/A'}  (seg: ${primary.usingSeg ? 'O' : 'X'})`,
+          `Ratio: ${avgRatio?.toFixed(3) ?? 'N/A'}`,
+          `Server: ${serverSHR?.toFixed(3) ?? 'N/A'}`,
+          `── 결과 ──`,
+          `Straight ${scores.Straight}%`,
+          `Wave     ${scores.Wave}%`,
+          `Natural  ${scores.Natural}%`,
+          `→ ${KR[primaryType]}`,
+        ];
+        drawDebugOverlay(debugCanvas.current, primaryImg, primary.landmarks, primary.segData, IS_DEV ? infoPanel : null);
+        overlayPhoto = debugCanvas.current.toDataURL('image/jpeg', 0.92);
+        if (IS_DEV) log('오버레이 이미지 생성 완료');
+      }
+
+      // 추천 API
       if (IS_DEV) log('추천 API 호출중...');
       const recRes = await fetch('http://localhost:3000/api/recommend', {
         method: 'POST',
@@ -202,25 +394,26 @@ function AnalyzingPage() {
         body: JSON.stringify({
           gender:   userData.gender,
           style:    userData.style,
-          bodyType: KR[primary],
+          bodyType: KR[primaryType],
         }),
       });
       const recommendation = await recRes.json();
-      if (IS_DEV) log('추천 API 응답 완료 → 결과 페이지로 이동');
+      if (IS_DEV) log('추천 완료 → 결과 페이지 이동');
 
       navigate('/body-result', {
-        state: { userData, scores, primary, photo, recommendation },
+        state: { userData, scores, primary: primaryType, photo, overlayPhoto, recommendation },
       });
 
     } catch (err) {
       console.error('분석 실패:', err);
-      if (IS_DEV) log(`오류 발생: ${err.message}`);
+      if (IS_DEV) log(`오류: ${err.message}`);
       navigate('/body-result', {
         state: {
           userData,
           scores:   { Straight: 34, Wave: 33, Natural: 33 },
           primary:  'Straight',
           photo,
+          overlayPhoto: null,
           recommendation: null,
         },
       });
@@ -232,7 +425,9 @@ function AnalyzingPage() {
       <h1>분석중...</h1>
       <p>체형을 분석하고 있습니다. 잠시만 기다려 주세요.</p>
 
-      {/* ── 개발자 전용 디버그 패널 (npm run dev 환경에서만 표시) ── */}
+      {/* 오버레이 생성용 숨김 캔버스 (항상 마운트) */}
+      <canvas ref={debugCanvas} style={{ display: 'none' }} />
+
       {IS_DEV && (
         <div style={{
           marginTop: 40,
@@ -245,37 +440,14 @@ function AnalyzingPage() {
           marginInline: 'auto',
         }}>
           <p style={{ color: '#888', fontSize: 11, margin: '0 0 8px' }}>
-            🛠 DEV ONLY — 프로덕션 빌드에서는 표시되지 않음
+            🛠 DEV ONLY
           </p>
-
-          {/* 로그 */}
-          <div style={{
-            fontFamily: 'monospace',
-            fontSize: 13,
-            lineHeight: 1.7,
-            color: '#00e676',
-            minHeight: 40,
-          }}>
+          <div style={{ fontFamily: 'monospace', fontSize: 13, lineHeight: 1.7, color: '#00e676', minHeight: 40 }}>
             {devLog.length === 0
               ? <span style={{ color: '#555' }}>대기중...</span>
               : devLog.map((line, i) => <div key={i}>{line}</div>)
             }
           </div>
-
-          {/* 스켈레톤 오버레이 캔버스 */}
-          <canvas
-            ref={debugCanvas}
-            style={{
-              marginTop: 16,
-              maxWidth: '100%',
-              borderRadius: 6,
-              border: '1px solid #444',
-              display: 'block',
-            }}
-          />
-          <p style={{ color: '#555', fontSize: 11, marginTop: 6 }}>
-            빨간점: 어깨·힙 측정 기준  /  노란선: 어깨 너비  /  분홍선: 힙 너비
-          </p>
         </div>
       )}
     </div>
