@@ -13,8 +13,10 @@ function UserPage() {
     const [weight, setWeight] = useState('');
 
     const [capturedImage, setCapturedImage] = useState(null);
+    const [uploadedImageUrl, setUploadedImageUrl] = useState(null);
     const [countdown, setCountdown] = useState(null);
     const [isCounting, setIsCounting] = useState(false);
+    const [isUploading, setIsUploading] = useState(false);
 
     useEffect(() => {
         startCamera();
@@ -49,6 +51,42 @@ function UserPage() {
         }
     };
 
+    const uploadCapturedImage = async (blob) => {
+        try {
+            setIsUploading(true);
+
+            const imageFile = new File([blob], `user-photo-${Date.now()}.jpg`, {
+                type: 'image/jpeg',
+            });
+
+            const formData = new FormData();
+            formData.append('image', imageFile);
+            formData.append('height', height);
+            formData.append('weight', weight);
+            formData.append('gender', gender);
+
+            const response = await fetch('http://localhost:3000/api/upload', {
+                method: 'POST',
+                body: formData,
+            });
+
+            const result = await response.json();
+
+            if (!response.ok) {
+                throw new Error(result.message || '이미지 업로드 실패');
+            }
+
+            console.log('백엔드 업로드 응답:', result);
+
+            setUploadedImageUrl(result.data?.imageUrl || null);
+        } catch (error) {
+            console.error('이미지 업로드 실패:', error);
+            alert('이미지를 백엔드로 전송하지 못했습니다.');
+        } finally {
+            setIsUploading(false);
+        }
+    };
+
     const captureCurrentFrame = () => {
         const video = videoRef.current;
         const canvas = canvasRef.current;
@@ -60,18 +98,31 @@ function UserPage() {
 
         const ctx = canvas.getContext('2d');
 
+        ctx.save();
         ctx.translate(canvas.width, 0);
         ctx.scale(-1, 1);
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        ctx.restore();
 
         const imageData = canvas.toDataURL('image/jpeg', 0.92);
         setCapturedImage(imageData);
+
+        canvas.toBlob(
+            (blob) => {
+                if (!blob) return;
+
+                uploadCapturedImage(blob);
+            },
+            'image/jpeg',
+            0.92,
+        );
     };
 
     const handleCapture = () => {
-        if (isCounting) return;
+        if (isCounting || isUploading) return;
 
         setCapturedImage(null);
+        setUploadedImageUrl(null);
         setIsCounting(true);
         setCountdown(3);
 
@@ -92,16 +143,15 @@ function UserPage() {
     };
 
     const handleRetry = () => {
-        if (isCounting) return;
+        if (isCounting || isUploading) return;
 
         setCapturedImage(null);
+        setUploadedImageUrl(null);
 
-        // 카메라가 꺼져있으면 다시 실행
         if (!streamRef.current) {
             startCamera();
         }
 
-        // 바로 다시 촬영 시작
         setIsCounting(true);
         setCountdown(3);
 
@@ -132,6 +182,11 @@ function UserPage() {
             return;
         }
 
+        if (isUploading) {
+            alert('이미지를 업로드 중입니다. 잠시 후 다시 시도해주세요.');
+            return;
+        }
+
         stopCamera();
 
         navigate('/camera', {
@@ -140,6 +195,7 @@ function UserPage() {
                 height,
                 weight,
                 image: capturedImage,
+                imageUrl: uploadedImageUrl,
             },
         });
     };
@@ -153,7 +209,6 @@ function UserPage() {
 
                 <div className="flex flex-col items-center">
                     <div className="flex flex-col lg:flex-row justify-center gap-5 w-full">
-                        {/* 왼쪽 입력 카드 */}
                         <div className="w-full lg:w-[300px] rounded-xl bg-white/55 backdrop-blur-md shadow-lg p-7">
                             <h2 className="text-xl font-extrabold text-center text-gray-900 mb-5">신체 데이터 입력</h2>
 
@@ -196,7 +251,6 @@ function UserPage() {
                             </div>
                         </div>
 
-                        {/* 오른쪽 카메라 카드 */}
                         <div className="w-full lg:w-[590px] rounded-xl bg-white/55 backdrop-blur-md shadow-lg p-4">
                             <h2 className="text-xl font-extrabold text-center text-gray-900 mb-3">
                                 카메라 촬영 및 미리보기
@@ -275,24 +329,28 @@ function UserPage() {
                                 </div>
                             </div>
 
-                            <div className="flex gap-2 mt-3">
+                            <div className="flex gap-2 mt-3 items-center">
                                 <button
                                     onClick={handleCapture}
-                                    disabled={isCounting}
+                                    disabled={isCounting || isUploading}
                                     className={`px-6 h-9 rounded-full text-sm font-extrabold border-2 border-black ${
-                                        isCounting ? 'bg-gray-300 text-white' : 'bg-white text-black'
+                                        isCounting || isUploading ? 'bg-gray-300 text-white' : 'bg-white text-black'
                                     }`}
                                 >
-                                    촬영 (CAPTURE)
+                                    {isUploading ? '업로드 중...' : '촬영 (CAPTURE)'}
                                 </button>
 
                                 <button
                                     onClick={handleRetry}
-                                    disabled={isCounting}
+                                    disabled={isCounting || isUploading}
                                     className="px-6 h-9 rounded-full text-sm font-extrabold bg-gray-200"
                                 >
                                     재촬영 (RETRY)
                                 </button>
+
+                                {uploadedImageUrl && (
+                                    <span className="text-xs font-bold text-green-600">백엔드 전송 완료</span>
+                                )}
                             </div>
                         </div>
                     </div>
