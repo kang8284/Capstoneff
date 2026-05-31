@@ -3,10 +3,10 @@ const cors = require('cors');
 const multer = require('multer');
 const mongoose = require('mongoose');
 const cloudinary = require('./config/cloudinary');
+const { spawn } = require('child_process');
 require('dotenv').config();
 
 const app = express();
-const { spawn } = require('child_process');
 
 app.use(cors());
 app.use(express.json());
@@ -52,44 +52,84 @@ const upload = multer({ storage });
 
 /* =========================
    사진 품질 검사 API
-   현재는 mock, 나중에 실제 모델 연결
+   Python quality_check.py 실행
 ========================= */
-app.post(
-  '/api/check-quality',
-  upload.single('image'),
-  async (req, res) => {
+app.post('/api/check-quality', upload.single('image'), async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({
+                valid: false,
+                reasons: ['검사할 이미지가 없습니다.'],
+            });
+        }
 
-    if (!req.file) {
-      return res.status(400).json({
-        success: false,
-        message: '이미지가 없습니다.'
-      });
+        const imagePath = req.file.path;
+
+        const python = spawn('python', ['quality_check.py', imagePath], {
+            cwd: __dirname,
+            env: {
+                ...process.env,
+                PYTHONIOENCODING: 'utf-8',
+            },
+        });
+
+        let resultData = '';
+        let errorData = '';
+
+        python.stdout.on('data', (data) => {
+            resultData += data.toString('utf8');
+        });
+
+        python.stderr.on('data', (data) => {
+            errorData += data.toString('utf8');
+        });
+
+        python.on('close', (code) => {
+            if (errorData) {
+                console.error('Python stderr:', errorData);
+            }
+
+            if (code !== 0 && !resultData) {
+                return res.status(500).json({
+                    valid: false,
+                    reasons: ['사진 품질 검사 실행 중 오류가 발생했습니다.'],
+                });
+            }
+
+            try {
+                const qualityResult = JSON.parse(resultData);
+
+                return res.json({
+                    ...qualityResult,
+                    imageUrl: `http://localhost:3000/uploads/${req.file.filename}`,
+                });
+            } catch (err) {
+                console.error('품질검사 결과 파싱 실패:', err);
+                console.error('Python stdout:', resultData);
+
+                return res.status(500).json({
+                    valid: false,
+                    reasons: ['품질검사 결과를 처리하지 못했습니다.'],
+                });
+            }
+        });
+
+        python.on('error', (err) => {
+            console.error('Python 실행 실패:', err);
+
+            return res.status(500).json({
+                valid: false,
+                reasons: ['Python 품질검사 파일을 실행하지 못했습니다.'],
+            });
+        });
+    } catch (err) {
+        console.error(err);
+
+        return res.status(500).json({
+            valid: false,
+            reasons: ['사진 품질 검사 중 서버 오류가 발생했습니다.'],
+        });
     }
-
-    const python = spawn(
-      'python',
-      [
-        'quality_check.py',
-        req.file.path
-      ]
-    );
-
-    let result = '';
-
-    python.stdout.on('data', (data) => {
-      result += data.toString();
-    });
-
-    python.on('close', () => {
-
-      const qualityResult =
-        JSON.parse(result);
-
-      res.json({
-        success: true,
-        ...qualityResult
-      });
-    });
 });
 
 /* =========================

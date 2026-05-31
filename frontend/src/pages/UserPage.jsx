@@ -15,6 +15,7 @@ function UserPage() {
     const [capturedImage, setCapturedImage] = useState(null);
     const [uploadedImageUrl, setUploadedImageUrl] = useState(null);
     const [qualityPassed, setQualityPassed] = useState(false);
+    const [qualityMessage, setQualityMessage] = useState('');
 
     const [countdown, setCountdown] = useState(null);
     const [isCounting, setIsCounting] = useState(false);
@@ -57,6 +58,7 @@ function UserPage() {
         try {
             setIsUploading(true);
             setQualityPassed(false);
+            setQualityMessage('');
 
             const imageFile = new File([blob], `user-photo-${Date.now()}.jpg`, {
                 type: 'image/jpeg',
@@ -81,19 +83,27 @@ function UserPage() {
 
             console.log('사진 품질 검사 응답:', result);
 
-            if (result.success) {
+            if (result.valid === true) {
                 setQualityPassed(true);
                 setUploadedImageUrl(result.imageUrl || null);
-                console.log('품질 검사 통과');
+                setQualityMessage('사진 품질 검사를 통과했습니다.');
             } else {
                 setQualityPassed(false);
                 setCapturedImage(null);
-                alert(result.message || '사진 품질이 적합하지 않습니다. 다시 촬영해주세요.');
+
+                const reasonText =
+                    result.reasons && result.reasons.length > 0
+                        ? result.reasons.join('\n')
+                        : '사진 품질이 적합하지 않습니다.';
+
+                setQualityMessage(reasonText);
+                alert(`사진 품질 검사 실패\n\n${reasonText}`);
             }
         } catch (error) {
             console.error('사진 품질 검사 실패:', error);
             setQualityPassed(false);
             setCapturedImage(null);
+            setQualityMessage('사진 품질 검사 중 오류가 발생했습니다.');
             alert('사진 품질 검사 중 오류가 발생했습니다.');
         } finally {
             setIsUploading(false);
@@ -123,7 +133,6 @@ function UserPage() {
         canvas.toBlob(
             (blob) => {
                 if (!blob) return;
-
                 checkImageQuality(blob);
             },
             'image/jpeg',
@@ -137,6 +146,7 @@ function UserPage() {
         setCapturedImage(null);
         setUploadedImageUrl(null);
         setQualityPassed(false);
+        setQualityMessage('');
         setIsCounting(true);
         setCountdown(3);
 
@@ -162,6 +172,7 @@ function UserPage() {
         setCapturedImage(null);
         setUploadedImageUrl(null);
         setQualityPassed(false);
+        setQualityMessage('');
 
         if (!streamRef.current) {
             startCamera();
@@ -350,7 +361,7 @@ function UserPage() {
                                 </div>
                             </div>
 
-                            <div className="flex gap-2 mt-3 items-center">
+                            <div className="flex gap-2 mt-3 items-center flex-wrap">
                                 <button
                                     onClick={handleCapture}
                                     disabled={isCounting || isUploading}
@@ -373,6 +384,16 @@ function UserPage() {
                                     <span className="text-xs font-bold text-green-600">품질 검사 통과</span>
                                 )}
                             </div>
+
+                            {qualityMessage && (
+                                <div
+                                    className={`mt-3 rounded-lg px-4 py-3 text-sm font-bold whitespace-pre-line ${
+                                        qualityPassed ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'
+                                    }`}
+                                >
+                                    {qualityMessage}
+                                </div>
+                            )}
                         </div>
                     </div>
 
