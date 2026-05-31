@@ -332,17 +332,21 @@ async function runHuggingFace(personUrl, garmentUrl) {
     const { Client } = await import('@gradio/client');
     const client = await Client.connect('yisol/IDM-VTON');
     const result = await client.predict('/tryon', {
-        dict:          { background: personUrl, layers: [], composite: null },
-        garm_img:      garmentUrl,
-        garment_des:   'upper_body',
-        is_checked:    true,
+        dict: {
+            background: client.handle_file(personUrl),
+            layers:     [],
+            composite:  null,
+        },
+        garm_img:        client.handle_file(garmentUrl),
+        garment_des:     '상의',
+        is_checked:      true,
         is_checked_crop: false,
-        denoise_steps: 30,
-        seed:          42,
+        denoise_steps:   30,
+        seed:            42,
     });
     const output = result?.data?.[0];
     if (!output) throw new Error('HuggingFace 결과 없음');
-    return typeof output === 'string' ? output : output.url ?? output.path;
+    return typeof output === 'string' ? output : (output.url ?? output.path);
 }
 
 async function runReplicate(personUrl, garmentUrl, category, token) {
