@@ -249,32 +249,37 @@ app.post('/api/upload', upload.single('image'), (req, res) => {
 });
 
 /* =========================
+   값 매핑 (한국어 → DB 영어)
+========================= */
+const GENDER_MAP   = { '남자': 'male', '여자': 'female', male: 'male', female: 'female' };
+const BODY_MAP     = { '스트레이트': 'straight', '웨이브': 'wave', '내추럴': 'natural', straight: 'straight', wave: 'wave', natural: 'natural' };
+const STYLE_MAP    = { '캐주얼': 'casual', '스트릿': 'street', '포멀': 'formal', casual: 'casual', street: 'street', formal: 'formal' };
+
+/* =========================
    2. 추천 API
 ========================= */
 app.post('/api/recommend', async (req, res) => {
     try {
         const { gender, style, bodyType: bodyTypeFromClient } = req.body;
 
-        const bodyTypes = ['스트레이트', '웨이브', '내추럴'];
-        const bodyType = bodyTypes.includes(bodyTypeFromClient)
-            ? bodyTypeFromClient
-            : bodyTypes[Math.floor(Math.random() * bodyTypes.length)];
+        const dbGender   = GENDER_MAP[gender]              ?? 'male';
+        const dbBodyType = BODY_MAP[bodyTypeFromClient]    ?? 'straight';
+        const dbStyle    = STYLE_MAP[style]                ?? null;
 
-        console.log('bodyType:', bodyType);
+        console.log('recommend query:', { dbGender, dbBodyType, dbStyle });
 
-        const results = await Outfit.find({
-            gender,
-            style,
-            bodyType,
-        });
+        const query = { gender: dbGender, bodyType: dbBodyType };
+        if (dbStyle) query.style = dbStyle;
 
-        const top = results.filter((i) => i.category === 'top');
+        const results = await Outfit.find(query);
+
+        const top    = results.filter((i) => i.category === 'top');
         const bottom = results.filter((i) => i.category === 'bottom');
-        const jacket = results.filter((i) => i.category === 'jacket');
+        const jacket = results.filter((i) => i.category === 'outer');
 
         res.json({
-            bodyType,
-            top: top ?? [],
+            bodyType: bodyTypeFromClient,
+            top:    top    ?? [],
             bottom: bottom ?? [],
             jacket: jacket ?? [],
         });
@@ -496,10 +501,12 @@ app.post('/api/fitting-simple', async (req, res) => {
     const { personImage, gender = '남자' } = req.body;
     if (!personImage) return res.status(400).json({ error: '인물 이미지 필요' });
 
+    const dbGender = GENDER_MAP[gender] ?? 'male';
+
     // MongoDB에서 테스트 상의 1개 선택
-    const outfit = await Outfit.findOne({ gender, category: 'top' }).catch(() => null);
+    const outfit = await Outfit.findOne({ gender: dbGender, category: 'top' }).catch(() => null);
     if (!outfit?.imageUrl) {
-        return res.status(404).json({ error: `DB에 ${gender} 상의 데이터 없음` });
+        return res.status(404).json({ error: `DB에 ${dbGender} 상의 데이터 없음` });
     }
 
     const jobId = Date.now().toString();
@@ -507,14 +514,15 @@ app.post('/api/fitting-simple', async (req, res) => {
         status: 'processing',
         steps: [{ key: 'top', label: '상의', status: 'pending', viton: true }],
         resultUrl: null,
-        outfitName: outfit.name,
+        outfitName: outfitName,
         outfitImageUrl: outfit.imageUrl,
         currentStep: '시작 중...',
         error: null,
         mock: false,
     });
 
-    res.json({ jobId, outfitName: outfit.name, outfitImageUrl: outfit.imageUrl });
+    const outfitName = outfit.name || `${outfit.style ?? ''} ${outfit.bodyType ?? ''} 상의`.trim();
+    res.json({ jobId, outfitName, outfitImageUrl: outfit.imageUrl });
 
     (async () => {
         const job = fittingJobs.get(jobId);
