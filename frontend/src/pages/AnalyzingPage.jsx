@@ -281,6 +281,17 @@ function AnalyzingPage() {
   }, []);
 
   async function runAnalysis(userData, photo, photos) {
+    // 피팅은 분석과 독립적으로 즉시 시작 (try/catch 바깥)
+    if (IS_DEV) log('피팅 API 즉시 호출...');
+    const fittingPromise = fetch('http://localhost:3000/api/fitting-simple', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ personImage: photo, gender: userData.gender }),
+    }).then(r => r.json()).catch(e => {
+      if (IS_DEV) log(`피팅 호출 실패: ${e.message}`);
+      return null;
+    });
+
     try {
       if (IS_DEV) log('MediaPipe 모델 로딩 시작...');
 
@@ -386,10 +397,10 @@ function AnalyzingPage() {
         if (IS_DEV) log('오버레이 이미지 생성 완료');
       }
 
-      // 추천 API + 가상 피팅 동시 시작
-      if (IS_DEV) log('추천 API + 피팅 동시 호출중...');
+      // 추천 API + 피팅 결과 동시 수집
+      if (IS_DEV) log('추천 API 호출중...');
 
-      const [recRes, fittingRes] = await Promise.allSettled([
+      const [recRes, fittingResult] = await Promise.all([
         fetch('http://localhost:3000/api/recommend', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -398,38 +409,23 @@ function AnalyzingPage() {
             style:    userData.style,
             bodyType: KR[primaryType],
           }),
-        }).then(r => r.json()),
-
-        fetch('http://localhost:3000/api/fitting-simple', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            personImage: photo,
-            gender: userData.gender,
-          }),
-        }).then(r => r.json()),
+        }).then(r => r.json()).catch(() => null),
+        fittingPromise,
       ]);
 
-      const recommendation = recRes.status === 'fulfilled' ? recRes.value : null;
-      const fittingInfo    = fittingRes.status === 'fulfilled' && !fittingRes.value?.error
-        ? fittingRes.value
-        : null;
+      const fittingInfo = fittingResult && !fittingResult.error ? fittingResult : null;
 
       if (IS_DEV) {
-        log(`추천: ${recommendation ? 'OK' : 'FAIL'}`);
-        if (fittingRes.status === 'rejected') {
-          log(`피팅 실패(네트워크): ${fittingRes.reason}`);
-        } else if (fittingRes.value?.error) {
-          log(`피팅 실패(서버): ${fittingRes.value.error}`);
-        } else {
-          log(`피팅 시작: jobId=${fittingInfo?.jobId} outfit=${fittingInfo?.outfitName}`);
-        }
+        log(`추천: ${recRes ? 'OK' : 'FAIL'}`);
+        if (!fittingResult)        log('피팅: 호출 실패');
+        else if (fittingResult.error) log(`피팅 서버 오류: ${fittingResult.error}`);
+        else log(`피팅 시작 OK — jobId=${fittingInfo?.jobId} outfit=${fittingInfo?.outfitName}`);
       }
 
       navigate('/body-result', {
         state: {
           userData, scores, primary: primaryType, photo, overlayPhoto,
-          recommendation,
+          recommendation: recRes,
           fittingJobId:      fittingInfo?.jobId ?? null,
           fittingOutfitName: fittingInfo?.outfitName ?? null,
           fittingOutfitImg:  fittingInfo?.outfitImageUrl ?? null,
@@ -439,14 +435,20 @@ function AnalyzingPage() {
     } catch (err) {
       console.error('분석 실패:', err);
       if (IS_DEV) log(`오류: ${err.message}`);
+      const fittingResult = await fittingPromise;
+      const fittingInfo   = fittingResult && !fittingResult.error ? fittingResult : null;
+      if (IS_DEV) log(`catch — 피팅: ${fittingInfo ? `jobId=${fittingInfo.jobId}` : 'null'}`);
       navigate('/body-result', {
         state: {
           userData,
           scores:   { Straight: 34, Wave: 33, Natural: 33 },
           primary:  'Straight',
           photo,
-          overlayPhoto: null,
-          recommendation: null,
+          overlayPhoto:      null,
+          recommendation:    null,
+          fittingJobId:      fittingInfo?.jobId ?? null,
+          fittingOutfitName: fittingInfo?.outfitName ?? null,
+          fittingOutfitImg:  fittingInfo?.outfitImageUrl ?? null,
         },
       });
     }
