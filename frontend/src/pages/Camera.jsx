@@ -46,12 +46,53 @@ function Camera() {
 
     const userData = location.state;
     const [selectedStyle, setSelectedStyle] = useState(null);
+    const [isLoading, setIsLoading] = useState(false);
 
     const handleSelect = (styleId) => {
         setSelectedStyle((prev) => (prev === styleId ? null : styleId));
     };
 
-    const handleResult = () => {
+    const dataURLtoFile = (dataUrl, filename) => {
+        const arr = dataUrl.split(',');
+        const mime = arr[0].match(/:(.*?);/)[1];
+        const bstr = atob(arr[1]);
+        let n = bstr.length;
+        const u8arr = new Uint8Array(n);
+
+        while (n--) {
+            u8arr[n] = bstr.charCodeAt(n);
+        }
+
+        return new File([u8arr], filename, { type: mime });
+    };
+
+    const imageUrlToFile = async (url, filename) => {
+        const response = await fetch(url);
+        const blob = await response.blob();
+
+        return new File([blob], filename, {
+            type: blob.type || 'image/jpeg',
+        });
+    };
+
+    const pollFittingJob = async (jobId) => {
+        while (true) {
+            const response = await fetch(`http://localhost:3000/api/fitting/${jobId}`);
+            const result = await response.json();
+
+            if (result.status === 'done') {
+                return result;
+            }
+
+            if (result.status === 'failed') {
+                throw new Error(result.error || '가상 피팅 실패');
+            }
+
+            await new Promise((resolve) => setTimeout(resolve, 3000));
+        }
+    };
+
+    const handleResult = async () => {
         if (!userData) {
             navigate('/input');
             return;
@@ -62,12 +103,108 @@ function Camera() {
             return;
         }
 
-        navigate('/result', {
-            state: {
-                ...userData,
-                style: selectedStyle,
-            },
-        });
+        try {
+            setIsLoading(true);
+
+            const personFile = dataURLtoFile(userData.image, 'person.jpg');
+
+            const bodyFormData = new FormData();
+            bodyFormData.append('image', personFile);
+            bodyFormData.append('height', userData.height);
+            bodyFormData.append('weight', userData.weight);
+            bodyFormData.append('gender', userData.gender);
+
+            const bodyResponse = await fetch('http://localhost:3000/api/body-analysis', {
+                method: 'POST',
+                body: bodyFormData,
+            });
+
+            const bodyResult = await bodyResponse.json();
+
+            if (!bodyResponse.ok || !bodyResult.success) {
+                throw new Error(bodyResult.message || '체형 분석 실패');
+            }
+
+            console.log('체형 분석 결과:', bodyResult);
+
+            const recommendResponse = await fetch('http://localhost:3000/api/recommend', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    gender: userData.gender,
+                    style: selectedStyle,
+                    bodyType: bodyResult.bodyType,
+                }),
+            });
+
+            const recommendResult = await recommendResponse.json();
+
+            if (!recommendResponse.ok) {
+                throw new Error(recommendResult.message || '추천 실패');
+            }
+
+            console.log('추천 결과:', recommendResult);
+
+            let fittingResult = null;
+
+            const topItem = recommendResult.top?.[0];
+            const bottomItem = recommendResult.bottom?.[0];
+            const outerItem = recommendResult.jacket?.[0];
+
+            if (topItem || bottomItem || outerItem) {
+                const fittingFormData = new FormData();
+                fittingFormData.append('person', personFile);
+
+                if (topItem?.imageUrl) {
+                    const topFile = await imageUrlToFile(topItem.imageUrl, 'top.jpg');
+                    fittingFormData.append('top', topFile);
+                }
+
+                if (bottomItem?.imageUrl) {
+                    const bottomFile = await imageUrlToFile(bottomItem.imageUrl, 'bottom.jpg');
+                    fittingFormData.append('bottom', bottomFile);
+                }
+
+                if (outerItem?.imageUrl) {
+                    const outerFile = await imageUrlToFile(outerItem.imageUrl, 'outer.jpg');
+                    fittingFormData.append('outer', outerFile);
+                }
+
+                const fittingResponse = await fetch('http://localhost:3000/api/fitting', {
+                    method: 'POST',
+                    body: fittingFormData,
+                });
+
+                const fittingStartResult = await fittingResponse.json();
+
+                if (!fittingResponse.ok) {
+                    throw new Error(fittingStartResult.error || '가상 피팅 시작 실패');
+                }
+
+                console.log('가상 피팅 시작:', fittingStartResult);
+
+                fittingResult = await pollFittingJob(fittingStartResult.jobId);
+
+                console.log('가상 피팅 완료:', fittingResult);
+            }
+
+            navigate('/result', {
+                state: {
+                    ...userData,
+                    style: selectedStyle,
+                    bodyType: bodyResult.bodyType,
+                    recommend: recommendResult,
+                    fittingImage: fittingResult?.resultUrl || userData.image,
+                },
+            });
+        } catch (error) {
+            console.error('결과 생성 실패:', error);
+            alert(error.message || '결과 생성 중 오류가 발생했습니다.');
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     return (
@@ -134,9 +271,12 @@ function Camera() {
                 <div className="flex justify-center mt-10">
                     <button
                         onClick={handleResult}
-                        className="w-[320px] h-14 rounded-full bg-gradient-to-r from-purple-400 to-indigo-400 text-white text-xl font-extrabold shadow-lg hover:scale-105 transition"
+                        disabled={isLoading}
+                        className={`w-[320px] h-14 rounded-full text-white text-xl font-extrabold shadow-lg transition ${
+                            isLoading ? 'bg-gray-400' : 'bg-gradient-to-r from-purple-400 to-indigo-400 hover:scale-105'
+                        }`}
                     >
-                        결과 보기
+                        {isLoading ? '결과 생성 중...' : '결과 보기'}
                     </button>
                 </div>
             </div>

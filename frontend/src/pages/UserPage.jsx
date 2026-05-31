@@ -14,6 +14,8 @@ function UserPage() {
 
     const [capturedImage, setCapturedImage] = useState(null);
     const [uploadedImageUrl, setUploadedImageUrl] = useState(null);
+    const [qualityPassed, setQualityPassed] = useState(false);
+
     const [countdown, setCountdown] = useState(null);
     const [isCounting, setIsCounting] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
@@ -51,9 +53,10 @@ function UserPage() {
         }
     };
 
-    const uploadCapturedImage = async (blob) => {
+    const checkImageQuality = async (blob) => {
         try {
             setIsUploading(true);
+            setQualityPassed(false);
 
             const imageFile = new File([blob], `user-photo-${Date.now()}.jpg`, {
                 type: 'image/jpeg',
@@ -65,7 +68,7 @@ function UserPage() {
             formData.append('weight', weight);
             formData.append('gender', gender);
 
-            const response = await fetch('http://localhost:3000/api/upload', {
+            const response = await fetch('http://localhost:3000/api/check-quality', {
                 method: 'POST',
                 body: formData,
             });
@@ -73,15 +76,25 @@ function UserPage() {
             const result = await response.json();
 
             if (!response.ok) {
-                throw new Error(result.message || '이미지 업로드 실패');
+                throw new Error(result.message || '사진 품질 검사 실패');
             }
 
-            console.log('백엔드 업로드 응답:', result);
+            console.log('사진 품질 검사 응답:', result);
 
-            setUploadedImageUrl(result.data?.imageUrl || null);
+            if (result.success) {
+                setQualityPassed(true);
+                setUploadedImageUrl(result.imageUrl || null);
+                console.log('품질 검사 통과');
+            } else {
+                setQualityPassed(false);
+                setCapturedImage(null);
+                alert(result.message || '사진 품질이 적합하지 않습니다. 다시 촬영해주세요.');
+            }
         } catch (error) {
-            console.error('이미지 업로드 실패:', error);
-            alert('이미지를 백엔드로 전송하지 못했습니다.');
+            console.error('사진 품질 검사 실패:', error);
+            setQualityPassed(false);
+            setCapturedImage(null);
+            alert('사진 품질 검사 중 오류가 발생했습니다.');
         } finally {
             setIsUploading(false);
         }
@@ -111,7 +124,7 @@ function UserPage() {
             (blob) => {
                 if (!blob) return;
 
-                uploadCapturedImage(blob);
+                checkImageQuality(blob);
             },
             'image/jpeg',
             0.92,
@@ -123,6 +136,7 @@ function UserPage() {
 
         setCapturedImage(null);
         setUploadedImageUrl(null);
+        setQualityPassed(false);
         setIsCounting(true);
         setCountdown(3);
 
@@ -147,6 +161,7 @@ function UserPage() {
 
         setCapturedImage(null);
         setUploadedImageUrl(null);
+        setQualityPassed(false);
 
         if (!streamRef.current) {
             startCamera();
@@ -183,7 +198,12 @@ function UserPage() {
         }
 
         if (isUploading) {
-            alert('이미지를 업로드 중입니다. 잠시 후 다시 시도해주세요.');
+            alert('사진 품질 검사를 진행 중입니다. 잠시 후 다시 시도해주세요.');
+            return;
+        }
+
+        if (!qualityPassed) {
+            alert('사진 품질 검사가 완료되지 않았습니다. 다시 촬영해주세요.');
             return;
         }
 
@@ -196,6 +216,7 @@ function UserPage() {
                 weight,
                 image: capturedImage,
                 imageUrl: uploadedImageUrl,
+                qualityPassed,
             },
         });
     };
@@ -337,7 +358,7 @@ function UserPage() {
                                         isCounting || isUploading ? 'bg-gray-300 text-white' : 'bg-white text-black'
                                     }`}
                                 >
-                                    {isUploading ? '업로드 중...' : '촬영 (CAPTURE)'}
+                                    {isUploading ? '품질 검사 중...' : '촬영 (CAPTURE)'}
                                 </button>
 
                                 <button
@@ -348,8 +369,8 @@ function UserPage() {
                                     재촬영 (RETRY)
                                 </button>
 
-                                {uploadedImageUrl && (
-                                    <span className="text-xs font-bold text-green-600">백엔드 전송 완료</span>
+                                {qualityPassed && (
+                                    <span className="text-xs font-bold text-green-600">품질 검사 통과</span>
                                 )}
                             </div>
                         </div>
