@@ -509,19 +509,19 @@ app.post('/api/fitting-simple', async (req, res) => {
         return res.status(404).json({ error: `DB에 ${dbGender} 상의 데이터 없음` });
     }
 
+    const outfitName = outfit.name || `${outfit.style ?? ''} ${outfit.bodyType ?? ''} 상의`.trim();
     const jobId = Date.now().toString();
     fittingJobs.set(jobId, {
         status: 'processing',
         steps: [{ key: 'top', label: '상의', status: 'pending', viton: true }],
         resultUrl: null,
-        outfitName: outfitName,
+        outfitName,
         outfitImageUrl: outfit.imageUrl,
         currentStep: '시작 중...',
         error: null,
         mock: false,
     });
 
-    const outfitName = outfit.name || `${outfit.style ?? ''} ${outfit.bodyType ?? ''} 상의`.trim();
     res.json({ jobId, outfitName, outfitImageUrl: outfit.imageUrl });
 
     (async () => {
