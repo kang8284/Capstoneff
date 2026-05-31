@@ -266,8 +266,10 @@ function AnalyzingPage() {
   const navigate     = useNavigate();
   const ran           = useRef(false);
   const debugCanvas   = useRef(null);
-  const [devLog,      setDevLog]      = useState([]);
-  const [resultState, setResultState] = useState(null); // 분석 완료 후 세팅
+  const pollRef       = useRef(null);
+  const [devLog,       setDevLog]       = useState([]);
+  const [resultState,  setResultState]  = useState(null);
+  const [fittingStep,  setFittingStep]  = useState(null); // 피팅 진행 메시지
 
   const log = (msg) => {
     const ts = new Date().toLocaleTimeString('ko-KR', { hour12: false });
@@ -280,6 +282,37 @@ function AnalyzingPage() {
     if (!state?.photo || !state?.userData) { navigate('/body-input'); return; }
     runAnalysis(state.userData, state.photo, state.photos ?? [state.photo]);
   }, []);
+
+  // 체형 분석 완료 후 → 피팅 폴링 시작
+  useEffect(() => {
+    if (!resultState) return;
+    const jobId = resultState.fittingJobId;
+
+    // 피팅 jobId 없으면 바로 이동
+    if (!jobId) {
+      navigate('/body-result', { state: resultState });
+      return;
+    }
+
+    setFittingStep('AI 피팅 처리 중...');
+
+    pollRef.current = setInterval(async () => {
+      try {
+        const res  = await fetch(`http://localhost:3000/api/fitting/${jobId}`);
+        const data = await res.json();
+        setFittingStep(data.currentStep ?? 'AI 피팅 처리 중...');
+
+        if (data.status === 'done' || data.status === 'failed') {
+          clearInterval(pollRef.current);
+          navigate('/body-result', { state: resultState });
+        }
+      } catch {
+        // 네트워크 오류 무시하고 계속 폴링
+      }
+    }, 3000);
+
+    return () => clearInterval(pollRef.current);
+  }, [resultState]);
 
   async function runAnalysis(userData, photo, photos) {
     // 피팅은 분석과 독립적으로 즉시 시작 (try/catch 바깥)
@@ -453,32 +486,42 @@ function AnalyzingPage() {
 
   return (
     <div style={{ textAlign: 'center', padding: '60px 20px' }}>
-      {resultState ? (
+      {!resultState ? (
         <>
-          <h1>분석 완료!</h1>
-          <p>결과를 확인할 준비가 됐습니다.</p>
-          <button
-            onClick={() => navigate('/body-result', { state: resultState })}
-            style={{
-              marginTop: 20,
-              padding: '14px 48px',
-              fontSize: 18,
-              background: '#2196f3',
-              color: '#fff',
-              border: 'none',
-              borderRadius: 8,
-              cursor: 'pointer',
-            }}
-          >
-            결과 보기
-          </button>
+          <h1>체형 분석중...</h1>
+          <p>체형을 분석하고 있습니다. 잠시만 기다려 주세요.</p>
+          <div style={{ marginTop: 16, color: '#888', fontSize: 14 }}>
+            <span style={{
+              display: 'inline-block',
+              width: 20, height: 20,
+              border: '3px solid #ddd',
+              borderTopColor: '#555',
+              borderRadius: '50%',
+              animation: 'spin 0.8s linear infinite',
+              verticalAlign: 'middle',
+              marginRight: 8,
+            }} />
+            분석 중...
+          </div>
         </>
       ) : (
         <>
-          <h1>분석중...</h1>
-          <p>체형을 분석하고 있습니다. 잠시만 기다려 주세요.</p>
+          <h1>가상 피팅 중...</h1>
+          <p style={{ color: '#555' }}>{fittingStep ?? 'AI가 의상을 입혀보고 있습니다.'}</p>
+          <p style={{ color: '#aaa', fontSize: 13 }}>1~3분 정도 소요됩니다. 잠시만 기다려 주세요.</p>
+          <div style={{ marginTop: 16 }}>
+            <span style={{
+              display: 'inline-block',
+              width: 28, height: 28,
+              border: '4px solid #ddd',
+              borderTopColor: '#2196f3',
+              borderRadius: '50%',
+              animation: 'spin 0.8s linear infinite',
+            }} />
+          </div>
         </>
       )}
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
 
       {/* 오버레이 생성용 숨김 캔버스 (항상 마운트) */}
       <canvas ref={debugCanvas} style={{ display: 'none' }} />
