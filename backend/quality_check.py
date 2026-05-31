@@ -49,7 +49,7 @@ blur_score = cv2.Laplacian(
     cv2.CV_64F
 ).var()
 
-if blur_score < 100:
+if blur_score < 60:
     reasons.append("사진이 흐립니다.")
 
 # -----------------------------

@@ -138,24 +138,82 @@ app.post('/api/check-quality', upload.single('image'), async (req, res) => {
 ========================= */
 app.post('/api/body-analysis', upload.single('image'), async (req, res) => {
     try {
-        const { height, weight, gender } = req.body;
+        const { height, weight, gender, style } = req.body;
 
-        const bodyTypes = ['스트레이트', '웨이브', '내추럴'];
+        // =========================
+        // 임시 체형 분석
+        // 나중에 Python AI 결과로 교체
+        // =========================
 
-        const bodyType = bodyTypes[Math.floor(Math.random() * bodyTypes.length)];
+        const bodyTypes = [
+            'straight',
+            'wave',
+            'natural',
+        ];
+
+        const bodyType =
+            bodyTypes[Math.floor(Math.random() * bodyTypes.length)];
+
+        console.log('분석 결과:', bodyType);
+
+        // =========================
+        // MongoDB 추천 조회
+        // =========================
+
+        const results = await Outfit.find({
+            gender,
+            bodyType,
+            style,
+        });
+
+        const top = results.filter(
+            (item) => item.category === 'top'
+        );
+
+        const bottom = results.filter(
+            (item) => item.category === 'bottom'
+        );
+
+        const inner = results.filter(
+            (item) => item.category === 'inner'
+        );
+
+        const outer = results.filter(
+            (item) => item.category === 'outer'
+        );
+
+        const shoe = results.filter(
+            (item) => item.category === 'shoe'
+        );
+
+        // =========================
+        // 응답
+        // =========================
 
         res.json({
             success: true,
-            bodyType,
-            message: '체형 분석 완료',
-            mock: true,
-            input: {
+
+            analysis: {
+                bodyType,
                 height,
                 weight,
                 gender,
+                style,
             },
-            imageUrl: req.file ? `http://localhost:3000/uploads/${req.file.filename}` : null,
+
+            recommendation: {
+                top,
+                bottom,
+                inner,
+                outer,
+                shoe,
+            },
+
+            imageUrl: req.file
+                ? `http://localhost:3000/uploads/${req.file.filename}`
+                : null,
         });
+
     } catch (err) {
         console.error(err);
 
