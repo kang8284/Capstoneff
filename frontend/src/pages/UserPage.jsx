@@ -41,6 +41,8 @@ function UserPage() {
             }
 
             streamRef.current = stream;
+            const videoTrack = stream.getVideoTracks()[0];
+console.log('실제 카메라 설정:', videoTrack.getSettings());
         } catch (error) {
             console.error('카메라 실행 실패:', error);
             alert('카메라를 실행할 수 없습니다. 브라우저 권한을 확인해주세요.');
