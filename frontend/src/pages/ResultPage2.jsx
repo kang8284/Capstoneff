@@ -56,14 +56,17 @@ const outfitImages = {
 
 const bodyComments = {
     natural: {
-        shoulder: '어깨선과 골격감이 자연스럽게 드러나는 체형입니다. 너무 달라붙는 핏보다는 여유 있게 떨어지는 실루엣이 잘 어울립니다.',
+        shoulder:
+            '어깨선과 골격감이 자연스럽게 드러나는 체형입니다. 너무 달라붙는 핏보다는 여유 있게 떨어지는 실루엣이 잘 어울립니다.',
         lower: '하체 라인은 직선적인 느낌을 살리는 아이템이 좋습니다. 와이드 팬츠나 스트레이트 팬츠처럼 자연스럽게 떨어지는 핏을 추천합니다.',
         styling: '전체적으로 힘 있는 소재와 여유로운 핏을 활용하면 내추럴 체형의 분위기를 가장 잘 살릴 수 있습니다.',
     },
     wave: {
-        shoulder: '상체 라인이 비교적 부드럽고 곡선적인 느낌을 주는 체형입니다. 상의는 너무 박시한 핏보다 적당히 몸선을 살리는 디자인이 좋습니다.',
+        shoulder:
+            '상체 라인이 비교적 부드럽고 곡선적인 느낌을 주는 체형입니다. 상의는 너무 박시한 핏보다 적당히 몸선을 살리는 디자인이 좋습니다.',
         lower: '허리선을 강조하거나 하체 비율을 보완하는 아이템이 잘 어울립니다. 하이웨이스트 팬츠나 스커트가 비율을 정리해줍니다.',
-        styling: '부드러운 소재, 짧은 기장 상의, 허리 라인을 살리는 코디를 활용하면 웨이브 체형의 장점을 살릴 수 있습니다.',
+        styling:
+            '부드러운 소재, 짧은 기장 상의, 허리 라인을 살리는 코디를 활용하면 웨이브 체형의 장점을 살릴 수 있습니다.',
     },
     straight: {
         shoulder: '상체와 하체의 균형이 비교적 안정적인 체형입니다. 깔끔하고 정돈된 실루엣이 잘 어울립니다.',
@@ -95,11 +98,7 @@ function ResultPage2() {
     const currentImages = outfitImages[gender]?.[bodyType] || {};
     const bodyComment = bodyComments[bodyType] || bodyComments.natural;
 
-    const fittingImage =
-        state?.fittingImage ||
-        currentImages[style] ||
-        state?.image ||
-        '';
+    const fittingImage = state?.fittingImage || currentImages[style] || state?.image || '';
 
     const otherOutfits = Object.entries(currentImages)
         .filter(([styleId]) => styleId !== style)
@@ -197,9 +196,7 @@ function ResultPage2() {
 
                                     <section className="rounded-2xl bg-white/55 p-4 shadow-sm">
                                         <h3 className="text-xl font-extrabold mb-2">하체 및 비율 분석:</h3>
-                                        <p className="text-base leading-relaxed font-semibold">
-                                            {bodyComment.lower}
-                                        </p>
+                                        <p className="text-base leading-relaxed font-semibold">{bodyComment.lower}</p>
                                     </section>
 
                                     <section className="rounded-2xl bg-white/55 p-4 shadow-sm">
@@ -249,9 +246,7 @@ function ResultPage2() {
                         ) : (
                             <div className="animate-[scaleIn_0.45s_ease-out] rounded-2xl bg-white/90 shadow-xl p-4 min-h-[500px] flex flex-col">
                                 <div className="flex justify-between items-center mb-3">
-                                    <h3 className="text-base font-extrabold text-gray-900">
-                                        [{selectedOutfit.title}]
-                                    </h3>
+                                    <h3 className="text-base font-extrabold text-gray-900">[{selectedOutfit.title}]</h3>
 
                                     <button
                                         onClick={() => setSelectedOutfit(null)}
