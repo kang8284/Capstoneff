@@ -332,7 +332,9 @@ function UserPage() {
                                     onClick={handleCapture}
                                     disabled={isCounting || isUploading}
                                     className={`px-6 h-9 rounded-full text-sm font-extrabold border-2 border-black ${
-                                        isCounting || isUploading ? 'bg-gray-300 text-white' : 'bg-white text-black'
+                                        isCounting || isUploading
+                                            ? 'bg-gray-300 text-white cursor-not-allowed'
+                                            : 'bg-white text-black'
                                     }`}
                                 >
                                     {isUploading ? '품질 검사 중...' : '촬영 (CAPTURE)'}
@@ -341,7 +343,11 @@ function UserPage() {
                                 <button
                                     onClick={handleRetry}
                                     disabled={isCounting || isUploading}
-                                    className="px-6 h-9 rounded-full text-sm font-extrabold bg-gray-200"
+                                    className={`px-6 h-9 rounded-full text-sm font-extrabold ${
+                                        isCounting || isUploading
+                                            ? 'bg-gray-300 text-white cursor-not-allowed'
+                                            : 'bg-gray-200 text-black'
+                                    }`}
                                 >
                                     재촬영 (RETRY)
                                 </button>
@@ -360,14 +366,25 @@ function UserPage() {
                                     {qualityMessage}
                                 </div>
                             )}
+
+                            {isUploading && (
+                                <div className="mt-3 rounded-lg px-4 py-3 text-sm font-bold bg-gray-100 text-gray-600">
+                                    사진 품질을 검사하고 있습니다. 완료될 때까지 다음 단계로 이동할 수 없습니다.
+                                </div>
+                            )}
                         </div>
                     </div>
 
                     <button
                         onClick={handleNext}
-                        className="mt-9 w-[320px] h-12 rounded-full bg-gradient-to-r from-purple-400 to-indigo-400 text-white font-extrabold shadow-lg"
+                        disabled={isUploading}
+                        className={`mt-9 w-[320px] h-12 rounded-full text-white font-extrabold shadow-lg transition ${
+                            isUploading
+                                ? 'bg-gray-400 cursor-not-allowed opacity-70'
+                                : 'bg-gradient-to-r from-purple-400 to-indigo-400 hover:scale-105'
+                        }`}
                     >
-                        다음 단계로 이동 (NEXT)
+                        {isUploading ? '품질 검사 중...' : '다음 단계로 이동 (NEXT)'}
                     </button>
                 </div>
             </div>
