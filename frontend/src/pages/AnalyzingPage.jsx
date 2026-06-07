@@ -29,10 +29,6 @@ function dist(a, b) {
   return Math.sqrt((a.x - b.x) ** 2 + (a.y - b.y) ** 2);
 }
 
-/* ──────────────────────────────────────────
-   세그멘테이션 마스크에서 너비 측정
-   bustLevel: 0~1 (어깨에서 힙까지의 비율)
-────────────────────────────────────────── */
 function measureWidthAtY(maskArr, maskW, maskH, centerY, scanLines = 9) {
   const half = Math.floor(scanLines / 2);
   const widths = [];
@@ -48,9 +44,6 @@ function measureWidthAtY(maskArr, maskW, maskH, centerY, scanLines = 9) {
   return widths.length ? widths.reduce((a, b) => a + b, 0) / widths.length : null;
 }
 
-/* ──────────────────────────────────────────
-   단일 프레임 분석
-────────────────────────────────────────── */
 async function analyzeFrame(img, landmarker, segmenter) {
   const lmResult  = landmarker.detect(img);
   const segResult = segmenter.segment(img);
@@ -58,7 +51,6 @@ async function analyzeFrame(img, landmarker, segmenter) {
   const landmarks = lmResult.landmarks?.[0] ?? null;
   let segData = null;
 
-  // 세그멘테이션 마스크
   if (segResult.confidenceMasks?.length > 0) {
     const cm = segResult.confidenceMasks[0];
     const arr = cm.getAsFloat32Array();
@@ -68,7 +60,6 @@ async function analyzeFrame(img, landmarker, segmenter) {
 
   if (!landmarks) return { landmarks: null, shr: null, lmSHR: null, segSHR: null, bodyRatio: null, segData, visMap: {} };
 
-  // 가시성 체크
   const visMap = {};
   for (const idx of [11, 12, 23, 24, 27, 28]) {
     visMap[idx] = landmarks[idx]?.visibility ?? 0;
@@ -76,31 +67,23 @@ async function analyzeFrame(img, landmarker, segmenter) {
   const coreVisible = [11, 12, 23, 24].every(i => visMap[i] >= 0.5);
   if (!coreVisible) return { landmarks, shr: null, lmSHR: null, segSHR: null, bodyRatio: null, segData, visMap };
 
-  // LM 기반 SHR
   const lmSHR = dist(landmarks[11], landmarks[12]) / dist(landmarks[23], landmarks[24]);
 
-  // 세그멘테이션 기반 SHR (버스트 레벨 10-22%)
   let segSHR = null;
   if (segData) {
     const { arr, width: mW, height: mH } = segData;
     const shoulderY = (landmarks[11].y + landmarks[12].y) / 2;
     const hipY      = (landmarks[23].y + landmarks[24].y) / 2;
     const range     = hipY - shoulderY;
-
     const bustCY = Math.round((shoulderY + range * 0.15) * mH);
     const hipCY  = Math.round((hipY - range * 0.05)      * mH);
-
     const bustW = measureWidthAtY(arr, mW, mH, bustCY);
     const hipW  = measureWidthAtY(arr, mW, mH, hipCY);
-
-    if (bustW && hipW && bustW > 0.02 && hipW > 0.02) {
-      segSHR = bustW / hipW;
-    }
+    if (bustW && hipW && bustW > 0.02 && hipW > 0.02) segSHR = bustW / hipW;
   }
 
   const shr = segSHR ?? lmSHR;
 
-  // 상하체 비율
   let bodyRatio = null;
   if (visMap[27] >= 0.3 && visMap[28] >= 0.3) {
     const shoulderY = (landmarks[11].y + landmarks[12].y) / 2;
@@ -114,17 +97,14 @@ async function analyzeFrame(img, landmarker, segmenter) {
   return { landmarks, shr, lmSHR, segSHR, bodyRatio, segData, visMap, usingSeg: segSHR !== null };
 }
 
-/* ──────────────────────────────────────────
-   가중 점수 계산
-────────────────────────────────────────── */
 function computeScores({ shr, height, bodyRatio, serverSHR, gender }) {
   const g = (SHR_PARAMS[gender] ? gender : '여자');
   const indicators = [];
 
-  if (shr != null)       indicators.push({ label: 'SHR',    vals: TYPES.map(t => gaussian(shr,       ...SHR_PARAMS[g][t])),   w: 0.40 });
-  if (serverSHR != null) indicators.push({ label: 'Server', vals: TYPES.map(t => gaussian(serverSHR, ...SHR_PARAMS[g][t])),   w: 0.20 });
-  if (height)            indicators.push({ label: 'Height', vals: TYPES.map(t => gaussian(height,    ...HEIGHT_PARAMS[g][t])), w: 0.20 });
-  if (bodyRatio != null) indicators.push({ label: 'Ratio',  vals: TYPES.map(t => gaussian(bodyRatio, ...RATIO_PARAMS[g][t])), w: 0.20 });
+  if (shr != null)       indicators.push({ vals: TYPES.map(t => gaussian(shr,       ...SHR_PARAMS[g][t])),   w: 0.40 });
+  if (serverSHR != null) indicators.push({ vals: TYPES.map(t => gaussian(serverSHR, ...SHR_PARAMS[g][t])),   w: 0.20 });
+  if (height)            indicators.push({ vals: TYPES.map(t => gaussian(height,    ...HEIGHT_PARAMS[g][t])), w: 0.20 });
+  if (bodyRatio != null) indicators.push({ vals: TYPES.map(t => gaussian(bodyRatio, ...RATIO_PARAMS[g][t])), w: 0.20 });
 
   if (!indicators.length) return { Straight: 34, Wave: 33, Natural: 33 };
 
@@ -139,9 +119,6 @@ function computeScores({ shr, height, bodyRatio, serverSHR, gender }) {
   return Object.fromEntries(TYPES.map((t, i) => [t, pcts[i]]));
 }
 
-/* ──────────────────────────────────────────
-   서버 분석 (FastAPI)
-────────────────────────────────────────── */
 async function fetchServerAnalysis(photo, gender, height, weight) {
   const base64 = photo.split(',')[1];
   const res = await fetch('http://localhost:8000/api/analyze-body', {
@@ -154,7 +131,11 @@ async function fetchServerAnalysis(photo, gender, height, weight) {
 }
 
 /* ──────────────────────────────────────────
-   스켈레톤 + 디버그 오버레이 드로잉
+   개발자용 스켈레톤 오버레이 드로잉
+   빨간 점: 측정 기준 (어깨·힙)
+   하늘색 점: 나머지 랜드마크
+   초록 선: 스켈레톤
+   노란 점선: 어깨 너비 / 힙 너비 측정선
 ────────────────────────────────────────── */
 const CONNECTIONS = [
   [11, 12],
@@ -175,7 +156,6 @@ function drawDebugOverlay(canvas, img, landmarks, segData, infoPanel) {
   const ctx = canvas.getContext('2d');
   ctx.drawImage(img, 0, 0);
 
-  // 세그멘테이션 마스크 (반투명 보라)
   if (segData) {
     const { arr, width: mW, height: mH } = segData;
     const tmp = document.createElement('canvas');
@@ -193,7 +173,6 @@ function drawDebugOverlay(canvas, img, landmarks, segData, infoPanel) {
     ctx.drawImage(tmp, 0, 0, W, H);
   }
 
-  // 스켈레톤 연결선
   ctx.strokeStyle = 'rgba(0,255,80,0.85)';
   ctx.lineWidth   = Math.max(2, W * 0.003);
   for (const [a, b] of CONNECTIONS) {
@@ -205,7 +184,6 @@ function drawDebugOverlay(canvas, img, landmarks, segData, infoPanel) {
     ctx.stroke();
   }
 
-  // 랜드마크 점
   for (let i = 0; i < landmarks.length; i++) {
     const lm = landmarks[i];
     if (!lm) continue;
@@ -216,7 +194,6 @@ function drawDebugOverlay(canvas, img, landmarks, segData, infoPanel) {
     ctx.fill();
   }
 
-  // 어깨·힙 측정선
   const ls = landmarks[11], rs = landmarks[12];
   const lh = landmarks[23], rh = landmarks[24];
   ctx.setLineDash([8, 6]);
@@ -230,7 +207,6 @@ function drawDebugOverlay(canvas, img, landmarks, segData, infoPanel) {
 
   ctx.setLineDash([]);
 
-  // 레이블
   const fs = Math.max(14, W * 0.022);
   ctx.font = `bold ${fs}px monospace`;
   ctx.fillStyle = 'rgba(255,230,0,1)';
@@ -238,7 +214,6 @@ function drawDebugOverlay(canvas, img, landmarks, segData, infoPanel) {
   ctx.fillStyle = 'rgba(255,100,200,1)';
   ctx.fillText('← 힙 →', lh.x * W + 6, lh.y * H + fs + 4);
 
-  // 정보 패널 (우측 상단)
   if (infoPanel?.length) {
     const lineH = Math.max(16, H * 0.028);
     const panelW = Math.max(200, W * 0.38);
@@ -262,14 +237,11 @@ function drawDebugOverlay(canvas, img, landmarks, segData, infoPanel) {
    컴포넌트
 ────────────────────────────────────────── */
 function AnalyzingPage() {
-  const { state }    = useLocation();
-  const navigate     = useNavigate();
-  const ran           = useRef(false);
-  const debugCanvas   = useRef(null);
-  const pollRef       = useRef(null);
-  const [devLog,       setDevLog]       = useState([]);
-  const [resultState,  setResultState]  = useState(null);
-  const [fittingStep,  setFittingStep]  = useState(null); // 피팅 진행 메시지
+  const { state }   = useLocation();
+  const navigate    = useNavigate();
+  const ran         = useRef(false);
+  const debugCanvas = useRef(null);
+  const [devLog, setDevLog] = useState([]);
 
   const log = (msg) => {
     const ts = new Date().toLocaleTimeString('ko-KR', { hour12: false });
@@ -283,49 +255,7 @@ function AnalyzingPage() {
     runAnalysis(state.userData, state.photo, state.photos ?? [state.photo]);
   }, []);
 
-  // 체형 분석 완료 후 → 피팅 폴링 시작
-  useEffect(() => {
-    if (!resultState) return;
-    const jobId = resultState.fittingJobId;
-
-    // 피팅 jobId 없으면 바로 이동
-    if (!jobId) {
-      navigate('/body-result', { state: resultState });
-      return;
-    }
-
-    setFittingStep('AI 피팅 처리 중...');
-
-    pollRef.current = setInterval(async () => {
-      try {
-        const res  = await fetch(`http://localhost:3000/api/fitting/${jobId}`);
-        const data = await res.json();
-        setFittingStep(data.currentStep ?? 'AI 피팅 처리 중...');
-
-        if (data.status === 'done' || data.status === 'failed') {
-          clearInterval(pollRef.current);
-          navigate('/body-result', { state: resultState });
-        }
-      } catch {
-        // 네트워크 오류 무시하고 계속 폴링
-      }
-    }, 3000);
-
-    return () => clearInterval(pollRef.current);
-  }, [resultState]);
-
   async function runAnalysis(userData, photo, photos) {
-    // 피팅은 분석과 독립적으로 즉시 시작 (try/catch 바깥)
-    if (IS_DEV) log('피팅 API 즉시 호출...');
-    const fittingPromise = fetch('http://localhost:3000/api/fitting-simple', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ personImage: photo, gender: userData.gender }),
-    }).then(r => r.json()).catch(e => {
-      if (IS_DEV) log(`피팅 호출 실패: ${e.message}`);
-      return null;
-    });
-
     try {
       if (IS_DEV) log('MediaPipe 모델 로딩 시작...');
 
@@ -334,7 +264,7 @@ function AnalyzingPage() {
       const vision = await FilesetResolver.forVisionTasks(
         'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm'
       );
-      if (IS_DEV) log('WASM 로드 완료');
+      if (IS_DEV) log('WASM FilesetResolver 로드 완료');
 
       const [landmarker, segmenter] = await Promise.all([
         PoseLandmarker.createFromOptions(vision, {
@@ -368,13 +298,11 @@ function AnalyzingPage() {
         if (IS_DEV) log(`프레임 분석 — SHR: ${result.shr?.toFixed(3) ?? 'N/A'} | seg: ${result.usingSeg ? 'O' : 'X'}`);
       }
 
-      // 평균값 집계
       const validSHR   = frames.map(f => f.result.shr).filter(v => v != null);
       const validRatio = frames.map(f => f.result.bodyRatio).filter(v => v != null);
       const avgSHR     = validSHR.length   ? validSHR.reduce((a, b) => a + b, 0) / validSHR.length   : null;
       const avgRatio   = validRatio.length ? validRatio.reduce((a, b) => a + b, 0) / validRatio.length : null;
 
-      // 대표 프레임 (첫 번째, 오버레이용)
       const { result: primary, img: primaryImg } = frames[0];
 
       if (IS_DEV) {
@@ -384,7 +312,7 @@ function AnalyzingPage() {
         }
       }
 
-      // 서버 분석
+      // 서버 분석 (선택적 — 실패해도 계속 진행)
       let serverSHR = null;
       try {
         if (IS_DEV) log('서버 분석 요청중...');
@@ -431,101 +359,48 @@ function AnalyzingPage() {
         if (IS_DEV) log('오버레이 이미지 생성 완료');
       }
 
-      // 추천 API + 피팅 결과 동시 수집
+      // 추천 API 호출
       if (IS_DEV) log('추천 API 호출중...');
+      const recommendation = await fetch('http://localhost:3000/api/recommend', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          gender:   userData.gender,
+          style:    userData.style,
+          bodyType: KR[primaryType],
+        }),
+      }).then(r => r.json()).catch(() => null);
+      if (IS_DEV) log(`추천: ${recommendation ? 'OK' : 'FAIL'} → 결과 페이지로 이동`);
 
-      const [recRes, fittingResult] = await Promise.all([
-        fetch('http://localhost:3000/api/recommend', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            gender:   userData.gender,
-            style:    userData.style,
-            bodyType: KR[primaryType],
-          }),
-        }).then(r => r.json()).catch(() => null),
-        fittingPromise,
-      ]);
-
-      const fittingInfo = fittingResult && !fittingResult.error ? fittingResult : null;
-
-      if (IS_DEV) {
-        log(`추천: ${recRes ? 'OK' : 'FAIL'}`);
-        if (!fittingResult)        log('피팅: 호출 실패');
-        else if (fittingResult.error) log(`피팅 서버 오류: ${fittingResult.error}`);
-        else log(`피팅 시작 OK — jobId=${fittingInfo?.jobId} outfit=${fittingInfo?.outfitName}`);
-      }
-
-      setResultState({
-        userData, scores, primary: primaryType, photo, overlayPhoto,
-        recommendation: recRes,
-        fittingJobId:      fittingInfo?.jobId ?? null,
-        fittingOutfitName: fittingInfo?.outfitName ?? null,
-        fittingOutfitImg:  fittingInfo?.outfitImageUrl ?? null,
+      navigate('/body-result', {
+        state: { userData, scores, primary: primaryType, photo, overlayPhoto, recommendation },
       });
 
     } catch (err) {
       console.error('분석 실패:', err);
-      if (IS_DEV) log(`오류: ${err.message}`);
-      const fittingResult = await fittingPromise;
-      const fittingInfo   = fittingResult && !fittingResult.error ? fittingResult : null;
-      if (IS_DEV) log(`catch — 피팅: ${fittingInfo ? `jobId=${fittingInfo.jobId}` : 'null'}`);
-      setResultState({
-        userData,
-        scores:   { Straight: 34, Wave: 33, Natural: 33 },
-        primary:  'Straight',
-        photo,
-        overlayPhoto:      null,
-        recommendation:    null,
-        fittingJobId:      fittingInfo?.jobId ?? null,
-        fittingOutfitName: fittingInfo?.outfitName ?? null,
-        fittingOutfitImg:  fittingInfo?.outfitImageUrl ?? null,
+      if (IS_DEV) log(`오류 발생: ${err.message}`);
+      navigate('/body-result', {
+        state: {
+          userData,
+          scores:      { Straight: 34, Wave: 33, Natural: 33 },
+          primary:     'Straight',
+          photo,
+          overlayPhoto: null,
+          recommendation: null,
+        },
       });
     }
   }
 
   return (
     <div style={{ textAlign: 'center', padding: '60px 20px' }}>
-      {!resultState ? (
-        <>
-          <h1>체형 분석중...</h1>
-          <p>체형을 분석하고 있습니다. 잠시만 기다려 주세요.</p>
-          <div style={{ marginTop: 16, color: '#888', fontSize: 14 }}>
-            <span style={{
-              display: 'inline-block',
-              width: 20, height: 20,
-              border: '3px solid #ddd',
-              borderTopColor: '#555',
-              borderRadius: '50%',
-              animation: 'spin 0.8s linear infinite',
-              verticalAlign: 'middle',
-              marginRight: 8,
-            }} />
-            분석 중...
-          </div>
-        </>
-      ) : (
-        <>
-          <h1>가상 피팅 중...</h1>
-          <p style={{ color: '#555' }}>{fittingStep ?? 'AI가 의상을 입혀보고 있습니다.'}</p>
-          <p style={{ color: '#aaa', fontSize: 13 }}>1~3분 정도 소요됩니다. 잠시만 기다려 주세요.</p>
-          <div style={{ marginTop: 16 }}>
-            <span style={{
-              display: 'inline-block',
-              width: 28, height: 28,
-              border: '4px solid #ddd',
-              borderTopColor: '#2196f3',
-              borderRadius: '50%',
-              animation: 'spin 0.8s linear infinite',
-            }} />
-          </div>
-        </>
-      )}
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      <h1>분석중...</h1>
+      <p>체형을 분석하고 있습니다. 잠시만 기다려 주세요.</p>
 
-      {/* 오버레이 생성용 숨김 캔버스 (항상 마운트) */}
+      {/* 오버레이 생성용 숨김 캔버스 */}
       <canvas ref={debugCanvas} style={{ display: 'none' }} />
 
+      {/* ── 개발자 전용 디버그 패널 (npm run dev 환경에서만 표시) ── */}
       {IS_DEV && (
         <div style={{
           marginTop: 40,
@@ -538,9 +413,15 @@ function AnalyzingPage() {
           marginInline: 'auto',
         }}>
           <p style={{ color: '#888', fontSize: 11, margin: '0 0 8px' }}>
-            🛠 DEV ONLY
+            🛠 DEV ONLY — 프로덕션 빌드에서는 표시되지 않음
           </p>
-          <div style={{ fontFamily: 'monospace', fontSize: 13, lineHeight: 1.7, color: '#00e676', minHeight: 40 }}>
+          <div style={{
+            fontFamily: 'monospace',
+            fontSize: 13,
+            lineHeight: 1.7,
+            color: '#00e676',
+            minHeight: 40,
+          }}>
             {devLog.length === 0
               ? <span style={{ color: '#555' }}>대기중...</span>
               : devLog.map((line, i) => <div key={i}>{line}</div>)
