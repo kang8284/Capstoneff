@@ -11,7 +11,6 @@ import InputPage from "./pages/InputPage";
 import CameraPage from "./pages/CameraPage";
 import AnalyzingPage from "./pages/AnalyzingPage";
 import ResultPage from "./pages/ResultPage";
-import FittingTestPage from "./pages/FittingTestPage";
 
 function App() {
   return (
@@ -28,7 +27,6 @@ function App() {
         <Route path="/body-camera"  element={<CameraPage />} />
         <Route path="/analyzing"    element={<AnalyzingPage />} />
         <Route path="/body-result"  element={<ResultPage />} />
-        <Route path="/fitting-test" element={<FittingTestPage />} />
       </Routes>
     </BrowserRouter>
   );

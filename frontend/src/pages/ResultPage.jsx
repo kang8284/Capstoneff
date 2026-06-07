@@ -16,19 +16,19 @@ function ResultPage() {
     );
   }
 
-  const { userData, scores, primary, photo, recommendation } = state;
+  const { userData, scores, primary, photo, overlayPhoto, recommendation } = state;
 
   // 보조 체형 계산
-  const sorted = Object.entries(scores).sort((a, b) => b[1] - a[1]);
+  const sorted    = Object.entries(scores).sort((a, b) => b[1] - a[1]);
   const secondary = scores[primary] - sorted[1][1] <= THRESHOLD ? sorted[1][0] : null;
 
   return (
     <div>
       <h1>분석 결과</h1>
 
-      {/* 촬영 사진 */}
-      {photo && (
-        <img src={photo} width={240} style={{ borderRadius: 8 }} alt="촬영 사진" />
+      {/* 촬영 사진 (랜드마크 오버레이 우선 표시) */}
+      {(overlayPhoto || photo) && (
+        <img src={overlayPhoto ?? photo} width={240} style={{ borderRadius: 8 }} alt="촬영 사진" />
       )}
 
       {/* 입력 정보 */}

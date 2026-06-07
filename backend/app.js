@@ -2,14 +2,13 @@ const express = require('express');
 const cors = require('cors');
 const multer = require('multer');
 const mongoose = require('mongoose');
-const cloudinary = require('./config/cloudinary');
 const { spawn } = require('child_process');
 require('dotenv').config();
 
 const app = express();
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '20mb' }));
 
 // 이미지 정적 접근
 app.use('/uploads', express.static('uploads'));
@@ -65,7 +64,7 @@ app.post('/api/check-quality', upload.single('image'), async (req, res) => {
 
         const imagePath = req.file.path;
 
-        const python = spawn('python', ['quality_check.py', imagePath], {
+        const python = spawn('python3', ['quality_check.py', imagePath], {
             cwd: __dirname,
             env: {
                 ...process.env,
@@ -85,6 +84,8 @@ app.post('/api/check-quality', upload.single('image'), async (req, res) => {
         });
 
         python.on('close', (code) => {
+            if (res.headersSent) return;
+
             if (errorData) {
                 console.error('Python stderr:', errorData);
             }
@@ -117,10 +118,12 @@ app.post('/api/check-quality', upload.single('image'), async (req, res) => {
         python.on('error', (err) => {
             console.error('Python 실행 실패:', err);
 
-            return res.status(500).json({
-                valid: false,
-                reasons: ['Python 품질검사 파일을 실행하지 못했습니다.'],
-            });
+            if (!res.headersSent) {
+                res.status(500).json({
+                    valid: false,
+                    reasons: ['Python 품질검사 파일을 실행하지 못했습니다.'],
+                });
+            }
         });
     } catch (err) {
         console.error(err);
@@ -249,32 +252,37 @@ app.post('/api/upload', upload.single('image'), (req, res) => {
 });
 
 /* =========================
+   값 매핑 (한국어 → DB 영어)
+========================= */
+const GENDER_MAP   = { '남자': 'male', '여자': 'female', male: 'male', female: 'female' };
+const BODY_MAP     = { '스트레이트': 'straight', '웨이브': 'wave', '내추럴': 'natural', straight: 'straight', wave: 'wave', natural: 'natural' };
+const STYLE_MAP    = { '캐주얼': 'casual', '스트릿': 'street', '포멀': 'formal', casual: 'casual', street: 'street', formal: 'formal' };
+
+/* =========================
    2. 추천 API
 ========================= */
 app.post('/api/recommend', async (req, res) => {
     try {
         const { gender, style, bodyType: bodyTypeFromClient } = req.body;
 
-        const bodyTypes = ['스트레이트', '웨이브', '내추럴'];
-        const bodyType = bodyTypes.includes(bodyTypeFromClient)
-            ? bodyTypeFromClient
-            : bodyTypes[Math.floor(Math.random() * bodyTypes.length)];
+        const dbGender   = GENDER_MAP[gender]              ?? 'male';
+        const dbBodyType = BODY_MAP[bodyTypeFromClient]    ?? 'straight';
+        const dbStyle    = STYLE_MAP[style]                ?? null;
 
-        console.log('bodyType:', bodyType);
+        console.log('recommend query:', { dbGender, dbBodyType, dbStyle });
 
-        const results = await Outfit.find({
-            gender,
-            style,
-            bodyType,
-        });
+        const query = { gender: dbGender, bodyType: dbBodyType };
+        if (dbStyle) query.style = dbStyle;
 
-        const top = results.filter((i) => i.category === 'top');
+        const results = await Outfit.find(query);
+
+        const top    = results.filter((i) => i.category === 'top');
         const bottom = results.filter((i) => i.category === 'bottom');
-        const jacket = results.filter((i) => i.category === 'jacket');
+        const jacket = results.filter((i) => i.category === 'outer');
 
         res.json({
-            bodyType,
-            top: top ?? [],
+            bodyType: bodyTypeFromClient,
+            top:    top    ?? [],
             bottom: bottom ?? [],
             jacket: jacket ?? [],
         });
@@ -292,197 +300,36 @@ app.post('/api/recommend', async (req, res) => {
 });
 
 /* =========================
-   3. 가상 피팅 API
+   3. 가상 피팅 API (스텁 — 팀원 Camera.jsx 호환용)
+   실제 피팅 없이 즉시 완료 처리
 ========================= */
-
-const CAT_LABELS = {
-    top: '상의',
-    bottom: '하의',
-    outer: '아우터',
-    accessory: '악세서리',
-    shoes: '신발',
-    other: '기타',
-};
-
-const VITON_MAP = {
-    top: 'upper_body',
-    bottom: 'lower_body',
-    outer: 'upper_body',
-};
-
-const VITON_ORDER = ['top', 'bottom', 'outer'];
-const DISPLAY_ONLY = ['accessory', 'shoes', 'other'];
-
 const fittingJobs = new Map();
-
-async function uploadToCloudinary(filePath) {
-    const result = await cloudinary.uploader.upload(filePath, {
-        folder: 'fitting',
-    });
-
-    return result.secure_url;
-}
-
-async function runReplicate(personUrl, garmentUrl, category, token) {
-    const startRes = await fetch('https://api.replicate.com/v1/models/yisol/idm-vton/predictions', {
-        method: 'POST',
-        headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-            input: {
-                human_img: personUrl,
-                garm_img: garmentUrl,
-                garment_des: category,
-                category: category,
-                is_checked: true,
-                is_checked_crop: false,
-                denoise_steps: 30,
-                seed: 42,
-            },
-        }),
-    });
-
-    let prediction = await startRes.json();
-
-    if (prediction.error) {
-        throw new Error(prediction.error);
-    }
-
-    while (prediction.status !== 'succeeded' && prediction.status !== 'failed') {
-        await new Promise((r) => setTimeout(r, 3000));
-
-        const pollRes = await fetch(`https://api.replicate.com/v1/predictions/${prediction.id}`, {
-            headers: {
-                Authorization: `Bearer ${token}`,
-            },
-        });
-
-        prediction = await pollRes.json();
-    }
-
-    if (prediction.status === 'failed') {
-        throw new Error(prediction.error || 'Replicate 피팅 실패');
-    }
-
-    const output = prediction.output;
-
-    return Array.isArray(output) ? output[0] : output;
-}
-
-async function processJob(jobId, files) {
-    const job = fittingJobs.get(jobId);
-    const token = process.env.REPLICATE_API_TOKEN;
-
-    try {
-        job.currentStep = '인물 사진 업로드 중...';
-
-        const personUrl = await uploadToCloudinary(files.person[0].path);
-        let currentPersonUrl = personUrl;
-
-        for (const key of VITON_ORDER) {
-            if (!files[key]) continue;
-
-            const stepIdx = job.steps.findIndex((s) => s.key === key);
-
-            job.steps[stepIdx].status = 'processing';
-            job.currentStep = `${CAT_LABELS[key]} 피팅 중...`;
-
-            const garmentUrl = await uploadToCloudinary(files[key][0].path);
-
-            if (token) {
-                const resultUrl = await runReplicate(currentPersonUrl, garmentUrl, VITON_MAP[key], token);
-
-                currentPersonUrl = resultUrl;
-                job.steps[stepIdx].resultUrl = resultUrl;
-            } else {
-                job.steps[stepIdx].resultUrl = garmentUrl;
-                job.steps[stepIdx].mock = true;
-            }
-
-            job.steps[stepIdx].status = 'done';
-        }
-
-        for (const key of DISPLAY_ONLY) {
-            if (!files[key]) continue;
-
-            const stepIdx = job.steps.findIndex((s) => s.key === key);
-
-            job.steps[stepIdx].status = 'processing';
-
-            const url = await uploadToCloudinary(files[key][0].path);
-
-            job.steps[stepIdx].resultUrl = url;
-            job.steps[stepIdx].status = 'done';
-        }
-
-        job.status = 'done';
-        job.resultUrl = currentPersonUrl;
-        job.mock = !token;
-        job.currentStep = '완료';
-    } catch (err) {
-        job.status = 'failed';
-        job.error = err.message;
-        job.currentStep = '오류 발생';
-
-        console.error('[피팅 오류]', err.message);
-    }
-}
 
 const fittingUpload = multer({ storage }).fields([
     { name: 'person', maxCount: 1 },
     { name: 'top', maxCount: 1 },
     { name: 'bottom', maxCount: 1 },
     { name: 'outer', maxCount: 1 },
-    { name: 'accessory', maxCount: 1 },
-    { name: 'shoes', maxCount: 1 },
-    { name: 'other', maxCount: 1 },
 ]);
 
 app.post('/api/fitting', fittingUpload, (req, res) => {
     if (!req.files?.person) {
-        return res.status(400).json({
-            error: '인물 사진 필요',
-        });
+        return res.status(400).json({ error: '인물 사진 필요' });
     }
-
     const jobId = Date.now().toString();
-    const steps = [];
-
-    for (const key of [...VITON_ORDER, ...DISPLAY_ONLY]) {
-        if (req.files[key]) {
-            steps.push({
-                key,
-                label: CAT_LABELS[key],
-                status: 'pending',
-                viton: key in VITON_MAP,
-            });
-        }
-    }
-
     fittingJobs.set(jobId, {
-        status: 'processing',
-        steps,
+        status: 'done',
+        steps: [],
         resultUrl: null,
-        currentStep: '시작 중...',
+        currentStep: '완료',
         error: null,
     });
-
     res.json({ jobId });
-
-    processJob(jobId, req.files).catch(console.error);
 });
 
 app.get('/api/fitting/:jobId', (req, res) => {
     const job = fittingJobs.get(req.params.jobId);
-
-    if (!job) {
-        return res.status(404).json({
-            error: 'Job not found',
-        });
-    }
-
+    if (!job) return res.status(404).json({ error: 'Job not found' });
     res.json(job);
 });
 
