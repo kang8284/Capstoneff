@@ -195,6 +195,7 @@ app.post('/api/body-analysis', upload.single('image'), async (req, res) => {
 
         res.json({
             success: true,
+            bodyType,
 
             analysis: {
                 bodyType,
