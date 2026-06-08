@@ -520,31 +520,42 @@ function ResultPage2() {
                             </div>
 
                             {/* 텍스트 분석 */}
-                            <div className="flex-1 pt-4">
-                                <h2 className="text-3xl font-extrabold text-gray-900 mb-6 leading-snug">
-                                    당신의 Body 타입은
-                                    <br />
-                                    <span className="text-purple-600">{bodyTypeText}</span>입니다
-                                </h2>
+                            <div className="flex-1 pt-6">
+                                {processing ? (
+                                    <div className="flex flex-col items-center justify-center h-full gap-4">
+                                        <div className="w-10 h-10 border-4 border-purple-400 border-t-transparent rounded-full animate-spin" />
+                                        <p className="text-gray-500 font-semibold">체형 분석 중...</p>
+                                    </div>
+                                ) : (
+                                    <>
+                                        <h2 className="text-3xl font-extrabold text-gray-900 mb-6 leading-snug">
+                                            당신의 Body 타입은
+                                            <br />
+                                            <span className="text-purple-600">{bodyTypeText}</span>입니다
+                                        </h2>
 
-                                <div className="space-y-5 text-gray-900">
-                                    <section className="rounded-2xl bg-white/55 p-4 shadow-sm">
-                                        <h3 className="text-xl font-extrabold mb-2">숄더 라인 및 상체 분석:</h3>
-                                        <p className="text-base leading-relaxed font-semibold">
-                                            {bodyComment.shoulder}
-                                        </p>
-                                    </section>
+                                        <div className="space-y-5 text-gray-900">
+                                            <section className="rounded-2xl bg-white/55 p-4 shadow-sm">
+                                                <h3 className="text-xl font-extrabold mb-2">숄더 라인 및 상체 분석:</h3>
+                                                <p className="text-base leading-relaxed font-semibold">
+                                                    {bodyComment.shoulder}
+                                                </p>
+                                            </section>
 
-                                    <section className="rounded-2xl bg-white/55 p-4 shadow-sm">
-                                        <h3 className="text-xl font-extrabold mb-2">하체 및 비율 분석:</h3>
-                                        <p className="text-base leading-relaxed font-semibold">{bodyComment.lower}</p>
-                                    </section>
+                                            <section className="rounded-2xl bg-white/55 p-4 shadow-sm">
+                                                <h3 className="text-xl font-extrabold mb-2">하체 및 비율 분석:</h3>
+                                                <p className="text-base leading-relaxed font-semibold">{bodyComment.lower}</p>
+                                            </section>
 
-                                    <section className="rounded-2xl bg-white/55 p-4 shadow-sm">
-                                        <h3 className="text-xl font-extrabold mb-2">코디네이션 전략:</h3>
-                                        <p className="text-base leading-relaxed font-semibold">{bodyComment.styling}</p>
-                                    </section>
-                                </div>
+                                            <section className="rounded-2xl bg-white/55 p-4 shadow-sm">
+                                                <h3 className="text-xl font-extrabold mb-2">코디네이션 전략:</h3>
+                                                <p className="text-base leading-relaxed font-semibold">
+                                                    {bodyComment.styling}
+                                                </p>
+                                            </section>
+                                        </div>
+                                    </>
+                                )}
                             </div>
                         </div>
                     </div>

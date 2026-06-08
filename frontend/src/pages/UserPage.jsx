@@ -1,6 +1,55 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
+function PoseGuide({ width = 120, height = 240 }) {
+    const cx = width / 2;
+    const headR   = width * 0.10;
+    const headCY  = height * 0.08;
+    const shoulderY = height * 0.20;
+    const shoulderW = width * 0.36;
+    const hipY    = height * 0.50;
+    const hipW    = width * 0.26;
+    const kneeY   = height * 0.72;
+    const ankleY  = height * 0.90;
+    const footSpread = width * 0.12;
+
+    const lS = [cx - shoulderW, shoulderY];
+    const rS = [cx + shoulderW, shoulderY];
+    const lH = [cx - hipW, hipY];
+    const rH = [cx + hipW, hipY];
+    const lK = [cx - footSpread * 1.2, kneeY];
+    const rK = [cx + footSpread * 1.2, kneeY];
+    const lA = [cx - footSpread, ankleY];
+    const rA = [cx + footSpread, ankleY];
+    const lE = [cx - shoulderW * 1.25, shoulderY + (hipY - shoulderY) * 0.30];
+    const rE = [cx + shoulderW * 1.25, shoulderY + (hipY - shoulderY) * 0.30];
+    const lW = [cx - shoulderW * 1.15, hipY - (hipY - shoulderY) * 0.05];
+    const rW = [cx + shoulderW * 1.15, hipY - (hipY - shoulderY) * 0.05];
+    const neckY = headCY + headR;
+
+    const ln = (a, b, c = 'rgba(255,255,255,0.55)', w = 1.5) => (
+        <line x1={a[0]} y1={a[1]} x2={b[0]} y2={b[1]} stroke={c} strokeWidth={w} strokeLinecap="round" />
+    );
+    const dt = (p, r = 3, c = 'rgba(255,255,255,0.7)') => <circle cx={p[0]} cy={p[1]} r={r} fill={c} />;
+
+    return (
+        <svg width={width} height={height}
+            style={{ position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)', pointerEvents: 'none', zIndex: 10 }}>
+            <circle cx={cx} cy={headCY} r={headR} fill="none" stroke="rgba(255,255,255,0.6)" strokeWidth={1.5} />
+            {ln([cx, neckY], [cx, shoulderY])}
+            <line x1={lS[0]} y1={shoulderY} x2={rS[0]} y2={shoulderY} stroke="rgba(255,230,0,0.85)" strokeWidth={1.5} strokeDasharray="5 3" />
+            {ln(lS, lH)} {ln(rS, rH)}
+            <line x1={lH[0]} y1={hipY} x2={rH[0]} y2={hipY} stroke="rgba(255,100,200,0.85)" strokeWidth={1.5} strokeDasharray="5 3" />
+            {ln(lS, lE)} {ln(lE, lW)} {ln(rS, rE)} {ln(rE, rW)}
+            {ln(lH, lK)} {ln(lK, lA)} {ln(rH, rK)} {ln(rK, rA)}
+            {dt(lS, 3, 'rgba(255,230,0,0.9)')} {dt(rS, 3, 'rgba(255,230,0,0.9)')}
+            {dt(lH, 3, 'rgba(255,100,200,0.9)')} {dt(rH, 3, 'rgba(255,100,200,0.9)')}
+            {dt(lE, 2.5)} {dt(rE, 2.5)} {dt(lW, 2.5)} {dt(rW, 2.5)}
+            {dt(lK, 2.5)} {dt(rK, 2.5)} {dt(lA, 2.5)} {dt(rA, 2.5)}
+        </svg>
+    );
+}
+
 function UserPage() {
     const navigate = useNavigate();
 
@@ -302,6 +351,7 @@ function UserPage() {
                                         muted
                                         className="h-full w-full object-cover scale-x-[-1]"
                                     />
+                                    <PoseGuide width={120} height={240} />
 
                                     {countdown && (
                                         <div className="absolute inset-0 flex items-center justify-center bg-black/20">
