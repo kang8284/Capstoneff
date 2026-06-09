@@ -310,9 +310,7 @@ app.get('/api/fitting/:jobId', (req, res) => {
 });
 
 /* =========================
-<<<<<<< HEAD
    결과 이미지 내보내기 API
-   base64 이미지 수신 → uploads/ 저장 → URL 반환
 ========================= */
 app.post('/api/export-image', async (req, res) => {
     try {
@@ -379,9 +377,6 @@ app.get('/api/save-result', (req, res) => {
 
 /* =========================
    서버 실행
-=======
-서버 실행
->>>>>>> 95d30d7 (파이썬 버전 고정)
 ========================= */
 app.listen(3000, () => {
     console.log('서버 실행: http://localhost:3000');
