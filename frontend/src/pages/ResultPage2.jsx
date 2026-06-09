@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { QRCodeCanvas } from 'qrcode.react';
 
 const styleLabels = {
     casual: '캐주얼',
@@ -436,30 +435,39 @@ function ResultPage2() {
                             </div>
 
                             <div className="flex-1 pt-6">
-                                <h2 className="text-3xl font-extrabold text-gray-900 mb-6 leading-snug">
-                                    당신의 Body 타입은
-                                    <br />
-                                    <span className="text-purple-600">{bodyTypeText}</span>입니다
-                                </h2>
+                                {processing ? (
+                                    <div className="flex flex-col items-center justify-center h-full gap-4">
+                                        <div className="w-10 h-10 border-4 border-purple-400 border-t-transparent rounded-full animate-spin" />
+                                        <p className="text-gray-500 font-semibold">체형 분석 중...</p>
+                                    </div>
+                                ) : (
+                                    <>
+                                        <h2 className="text-3xl font-extrabold text-gray-900 mb-6 leading-snug">
+                                            당신의 Body 타입은
+                                            <br />
+                                            <span className="text-purple-600">{bodyTypeText}</span>입니다
+                                        </h2>
 
-                                <div className="space-y-5 text-gray-900">
-                                    <section className="rounded-2xl bg-white/55 p-4 shadow-sm">
-                                        <h3 className="text-xl font-extrabold mb-2">숄더 라인 및 상체 분석:</h3>
-                                        <p className="text-base leading-relaxed font-semibold">
-                                            {bodyComment.shoulder}
-                                        </p>
-                                    </section>
+                                        <div className="space-y-5 text-gray-900">
+                                            <section className="rounded-2xl bg-white/55 p-4 shadow-sm">
+                                                <h3 className="text-xl font-extrabold mb-2">숄더 라인 및 상체 분석:</h3>
+                                                <p className="text-base leading-relaxed font-semibold">
+                                                    {bodyComment.shoulder}
+                                                </p>
+                                            </section>
 
-                                    <section className="rounded-2xl bg-white/55 p-4 shadow-sm">
-                                        <h3 className="text-xl font-extrabold mb-2">하체 및 비율 분석:</h3>
-                                        <p className="text-base leading-relaxed font-semibold">{bodyComment.lower}</p>
-                                    </section>
+                                            <section className="rounded-2xl bg-white/55 p-4 shadow-sm">
+                                                <h3 className="text-xl font-extrabold mb-2">하체 및 비율 분석:</h3>
+                                                <p className="text-base leading-relaxed font-semibold">{bodyComment.lower}</p>
+                                            </section>
 
-                                    <section className="rounded-2xl bg-white/55 p-4 shadow-sm">
-                                        <h3 className="text-xl font-extrabold mb-2">코디네이션 전략:</h3>
-                                        <p className="text-base leading-relaxed font-semibold">{bodyComment.styling}</p>
-                                    </section>
-                                </div>
+                                            <section className="rounded-2xl bg-white/55 p-4 shadow-sm">
+                                                <h3 className="text-xl font-extrabold mb-2">코디네이션 전략:</h3>
+                                                <p className="text-base leading-relaxed font-semibold">{bodyComment.styling}</p>
+                                            </section>
+                                        </div>
+                                    </>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -549,19 +557,13 @@ function ResultPage2() {
                     }
                 `}</style>
 
-                <div className="relative mt-6 flex items-end justify-center">
+                <div className="flex justify-center mt-6">
                     <button
                         onClick={() => navigate('/')}
                         className="w-[300px] h-14 rounded-full bg-gradient-to-r from-purple-400 to-indigo-400 text-white text-xl font-extrabold shadow-lg hover:scale-105 transition"
                     >
                         ← 처음으로 돌아가기
                     </button>
-
-                    <div className="absolute right-0 bottom-0 rounded-lg bg-white/85 p-1.5 shadow-md flex flex-col items-center">
-                        <QRCodeCanvas value={shareUrl} size={70} />
-
-                        <p className="text-[9px] text-gray-600 mt-1 text-center leading-tight">모바일 보기</p>
-                    </div>
                 </div>
             </div>
         </div>
