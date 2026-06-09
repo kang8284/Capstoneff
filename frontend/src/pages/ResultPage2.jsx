@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import html2canvas from 'html2canvas';
-import { QRCodeCanvas } from 'qrcode.react';
+import QRCode from 'react-qr-code';
 
 const styleLabels = {
     casual: '캐주얼',
@@ -677,18 +677,7 @@ function ResultPage2() {
                             onClick={(e) => e.stopPropagation()}
                         >
                             <h2 className="text-xl font-extrabold text-gray-900">QR코드로 결과 저장</h2>
-                            <p className="text-sm text-gray-500 text-center">
-                                핸드폰 카메라로 QR을 스캔하면<br />결과 이미지를 저장할 수 있습니다
-                            </p>
-                            <QRCodeCanvas value={qrUrl} size={220} />
-                            <a
-                                href={qrUrl}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="text-xs text-blue-500 underline break-all text-center max-w-xs"
-                            >
-                                {qrUrl}
-                            </a>
+                            <QRCode value={qrUrl} size={220} style={{ height: 'auto', maxWidth: '100%', width: '220px' }} />
                             <button
                                 onClick={() => setQrUrl(null)}
                                 className="mt-2 px-8 h-10 rounded-full bg-gray-200 text-gray-700 font-bold hover:bg-gray-300"

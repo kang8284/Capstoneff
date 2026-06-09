@@ -5,7 +5,27 @@ const mongoose = require('mongoose');
 const { spawn } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
+const cloudinary = require('cloudinary').v2;
 require('dotenv').config();
+
+cloudinary.config({
+    cloud_name: process.env.CLOUD_NAME,
+    api_key: process.env.CLOUD_API_KEY,
+    api_secret: process.env.CLOUD_API_SECRET,
+});
+
+function getLocalIP() {
+    for (const ifaces of Object.values(os.networkInterfaces())) {
+        for (const iface of ifaces) {
+            if (iface.family === 'IPv4' && !iface.internal) {
+                return iface.address;
+            }
+        }
+    }
+    return 'localhost';
+}
+const LOCAL_IP = getLocalIP();
 
 const app = express();
 
@@ -340,22 +360,67 @@ app.get('/api/fitting/:jobId', (req, res) => {
    결과 이미지 내보내기 API
    base64 이미지 수신 → uploads/ 저장 → URL 반환
 ========================= */
-app.post('/api/export-image', (req, res) => {
+app.post('/api/export-image', async (req, res) => {
     try {
         const { image } = req.body;
         if (!image) return res.status(400).json({ error: '이미지 없음' });
 
-        const base64Data = image.replace(/^data:image\/\w+;base64,/, '');
-        const filename = `export-${Date.now()}.jpg`;
-        const filepath = path.join(__dirname, 'uploads', filename);
+        const result = await cloudinary.uploader.upload(image, {
+            folder: 'capstone-exports',
+            resource_type: 'image',
+        });
 
-        fs.writeFileSync(filepath, Buffer.from(base64Data, 'base64'));
-
-        res.json({ url: `http://localhost:3000/uploads/${filename}` });
+        res.json({ url: result.secure_url });
     } catch (err) {
         console.error('이미지 저장 실패:', err);
         res.status(500).json({ error: '이미지 저장 실패' });
     }
+});
+
+/* =========================
+   결과 저장 페이지
+   QR 스캔 → 자동 다운로드 + 버튼 fallback
+========================= */
+app.get('/api/save-result', (req, res) => {
+    const imgUrl = req.query.url;
+    if (!imgUrl) return res.status(400).send('이미지 URL이 없습니다.');
+
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.send(`<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>결과 이미지 저장</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #f3f0ff; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; font-family: sans-serif; padding: 24px; }
+    img { max-width: 100%; max-height: 60vh; border-radius: 16px; box-shadow: 0 8px 32px rgba(0,0,0,0.18); }
+    .btn { margin-top: 28px; padding: 16px 40px; background: linear-gradient(135deg, #7c3aed, #6366f1); color: white; border: none; border-radius: 50px; font-size: 18px; font-weight: bold; cursor: pointer; text-decoration: none; display: inline-block; box-shadow: 0 4px 16px rgba(124,58,237,0.4); }
+    p { margin-top: 14px; color: #888; font-size: 13px; text-align: center; }
+  </style>
+</head>
+<body>
+  <img src="${imgUrl}" alt="결과 이미지" />
+  <a id="dlBtn" class="btn" href="${imgUrl}" download="outfit-result.jpg">이미지 저장하기</a>
+  <p>버튼을 눌러 이미지를 저장하세요<br>아이폰은 이미지를 길게 눌러 사진 앱에 저장할 수 있습니다</p>
+  <script>
+    (async () => {
+      try {
+        const res = await fetch('${imgUrl}');
+        const blob = await res.blob();
+        const blobUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = blobUrl;
+        a.download = 'outfit-result.jpg';
+        document.body.appendChild(a);
+        a.click();
+        document.getElementById('dlBtn').href = blobUrl;
+      } catch(e) {}
+    })();
+  </script>
+</body>
+</html>`);
 });
 
 /* =========================
