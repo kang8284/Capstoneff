@@ -36,7 +36,7 @@ app.use(express.json({ limit: '20mb' }));
 app.use('/uploads', express.static('uploads'));
 
 /* =========================
-MongoDB Atlas 연결
+   MongoDB Atlas 연결
 ========================= */
 mongoose
     .connect(process.env.MONGO_URL)
@@ -44,7 +44,7 @@ mongoose
     .catch((err) => console.error('DB 연결 실패:', err));
 
 /* =========================
-Schema
+   Schema
 ========================= */
 const outfitSchema = new mongoose.Schema({
     gender: String,
@@ -58,7 +58,7 @@ const outfitSchema = new mongoose.Schema({
 const Outfit = mongoose.model('Outfit', outfitSchema);
 
 /* =========================
-Multer 설정
+   Multer 설정
 ========================= */
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
@@ -72,8 +72,8 @@ const storage = multer.diskStorage({
 const upload = multer({ storage });
 
 /* =========================
-사진 품질 검사 API
-Python quality_check.py 실행
+   사진 품질 검사 API
+   Python quality_check.py 실행
 ========================= */
 app.post('/api/check-quality', upload.single('image'), async (req, res) => {
     try {
@@ -86,12 +86,7 @@ app.post('/api/check-quality', upload.single('image'), async (req, res) => {
 
         const imagePath = req.file.path;
 
-        // ✅ FIX: python3 → py -3.12
-        const python = spawn('py', [
-            '-3.12',
-            'quality_check.py',
-            imagePath
-        ], {
+        const python = spawn('python3', ['quality_check.py', imagePath], {
             cwd: __dirname,
             env: {
                 ...process.env,
@@ -152,7 +147,6 @@ app.post('/api/check-quality', upload.single('image'), async (req, res) => {
                 });
             }
         });
-
     } catch (err) {
         console.error(err);
 
@@ -164,27 +158,83 @@ app.post('/api/check-quality', upload.single('image'), async (req, res) => {
 });
 
 /* =========================
-체형 분석 API
+   체형 분석 API
+   현재는 mock, 나중에 실제 체형분석 모델 연결
 ========================= */
 app.post('/api/body-analysis', upload.single('image'), async (req, res) => {
     try {
         const { height, weight, gender, style } = req.body;
 
-        const bodyTypes = ['straight', 'wave', 'natural'];
-        const bodyType = bodyTypes[Math.floor(Math.random() * bodyTypes.length)];
+        // =========================
+        // 임시 체형 분석
+        // 나중에 Python AI 결과로 교체
+        // =========================
 
-        const results = await Outfit.find({ gender, bodyType, style });
+        const bodyTypes = [
+            'straight',
+            'wave',
+            'natural',
+        ];
 
-        const top = results.filter(i => i.category === 'top');
-        const bottom = results.filter(i => i.category === 'bottom');
-        const inner = results.filter(i => i.category === 'inner');
-        const outer = results.filter(i => i.category === 'outer');
-        const shoe = results.filter(i => i.category === 'shoe');
+        const bodyType =
+            bodyTypes[Math.floor(Math.random() * bodyTypes.length)];
+
+        console.log('분석 결과:', bodyType);
+
+        // =========================
+        // MongoDB 추천 조회
+        // =========================
+
+        const results = await Outfit.find({
+            gender,
+            bodyType,
+            style,
+        });
+
+        const top = results.filter(
+            (item) => item.category === 'top'
+        );
+
+        const bottom = results.filter(
+            (item) => item.category === 'bottom'
+        );
+
+        const inner = results.filter(
+            (item) => item.category === 'inner'
+        );
+
+        const outer = results.filter(
+            (item) => item.category === 'outer'
+        );
+
+        const shoe = results.filter(
+            (item) => item.category === 'shoe'
+        );
+
+        // =========================
+        // 응답
+        // =========================
 
         res.json({
             success: true,
-            analysis: { bodyType, height, weight, gender, style },
-            recommendation: { top, bottom, inner, outer, shoe },
+            bodyType,
+
+            analysis: {
+                bodyType,
+                height,
+                weight,
+                gender,
+                style,
+            },
+
+            recommendation: {
+                top,
+                bottom,
+                inner,
+                outer,
+                shoe,
+            },
+
             imageUrl: req.file
                 ? `http://localhost:3000/uploads/${req.file.filename}`
                 : null,
@@ -201,7 +251,7 @@ app.post('/api/body-analysis', upload.single('image'), async (req, res) => {
 });
 
 /* =========================
-업로드 API
+   1. 업로드 API
 ========================= */
 app.post('/api/upload', upload.single('image'), (req, res) => {
     try {
@@ -215,9 +265,7 @@ app.post('/api/upload', upload.single('image'), (req, res) => {
                 weight,
                 gender,
                 style,
-                imageUrl: image
-                    ? `http://localhost:3000/uploads/${image.filename}`
-                    : null,
+                imageUrl: image ? `http://localhost:3000/uploads/${image.filename}` : null,
             },
         });
     } catch (err) {
@@ -227,39 +275,40 @@ app.post('/api/upload', upload.single('image'), (req, res) => {
 });
 
 /* =========================
-값 매핑
+   값 매핑 (한국어 → DB 영어)
 ========================= */
-const GENDER_MAP = { '남자': 'male', '여자': 'female', male: 'male', female: 'female' };
-const BODY_MAP = { '스트레이트': 'straight', '웨이브': 'wave', '내추럴': 'natural', straight: 'straight', wave: 'wave', natural: 'natural' };
-const STYLE_MAP = { '캐주얼': 'casual', '스트릿': 'street', '포멀': 'formal', casual: 'casual', street: 'street', formal: 'formal' };
+const GENDER_MAP   = { '남자': 'male', '여자': 'female', male: 'male', female: 'female' };
+const BODY_MAP     = { '스트레이트': 'straight', '웨이브': 'wave', '내추럴': 'natural', straight: 'straight', wave: 'wave', natural: 'natural' };
+const STYLE_MAP    = { '캐주얼': 'casual', '스트릿': 'street', '포멀': 'formal', casual: 'casual', street: 'street', formal: 'formal' };
 
 /* =========================
-추천 API
+   2. 추천 API
 ========================= */
 app.post('/api/recommend', async (req, res) => {
     try {
         const { gender, style, bodyType: bodyTypeFromClient } = req.body;
 
-        const dbGender = GENDER_MAP[gender] ?? 'male';
-        const dbBodyType = BODY_MAP[bodyTypeFromClient] ?? 'straight';
-        const dbStyle = STYLE_MAP[style] ?? null;
+        const dbGender   = GENDER_MAP[gender]              ?? 'male';
+        const dbBodyType = BODY_MAP[bodyTypeFromClient]    ?? 'straight';
+        const dbStyle    = STYLE_MAP[style]                ?? null;
+
+        console.log('recommend query:', { dbGender, dbBodyType, dbStyle });
 
         const query = { gender: dbGender, bodyType: dbBodyType };
         if (dbStyle) query.style = dbStyle;
 
         const results = await Outfit.find(query);
 
-        const top = results.filter(i => i.category === 'top');
-        const bottom = results.filter(i => i.category === 'bottom');
-        const jacket = results.filter(i => i.category === 'outer');
+        const top    = results.filter((i) => i.category === 'top');
+        const bottom = results.filter((i) => i.category === 'bottom');
+        const jacket = results.filter((i) => i.category === 'outer');
 
         res.json({
             bodyType: bodyTypeFromClient,
-            top: top ?? [],
+            top:    top    ?? [],
             bottom: bottom ?? [],
             jacket: jacket ?? [],
         });
-
     } catch (err) {
         console.error(err);
 
@@ -274,7 +323,8 @@ app.post('/api/recommend', async (req, res) => {
 });
 
 /* =========================
-가상 피팅 API
+   3. 가상 피팅 API (스텁 — 팀원 Camera.jsx 호환용)
+   실제 피팅 없이 즉시 완료 처리
 ========================= */
 const fittingJobs = new Map();
 
@@ -289,9 +339,7 @@ app.post('/api/fitting', fittingUpload, (req, res) => {
     if (!req.files?.person) {
         return res.status(400).json({ error: '인물 사진 필요' });
     }
-
     const jobId = Date.now().toString();
-
     fittingJobs.set(jobId, {
         status: 'done',
         steps: [],
@@ -299,7 +347,6 @@ app.post('/api/fitting', fittingUpload, (req, res) => {
         currentStep: '완료',
         error: null,
     });
-
     res.json({ jobId });
 });
 
@@ -311,6 +358,7 @@ app.get('/api/fitting/:jobId', (req, res) => {
 
 /* =========================
    결과 이미지 내보내기 API
+   base64 이미지 수신 → uploads/ 저장 → URL 반환
 ========================= */
 app.post('/api/export-image', async (req, res) => {
     try {
@@ -322,7 +370,8 @@ app.post('/api/export-image', async (req, res) => {
             resource_type: 'image',
         });
 
-        res.json({ url: result.secure_url });
+        const downloadUrl = result.secure_url.replace('/upload/', '/upload/fl_attachment/');
+        res.json({ url: downloadUrl });
     } catch (err) {
         console.error('이미지 저장 실패:', err);
         res.status(500).json({ error: '이미지 저장 실패' });
