@@ -1,5 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import html2canvas from 'html2canvas';
+import { QRCodeCanvas } from 'qrcode.react';
 
 const styleLabels = {
     casual: '캐주얼',
@@ -305,6 +307,9 @@ function ResultPage2() {
     const [personImgUrl, setPersonImgUrl] = useState(null);
     const [metrics, setMetrics] = useState(null);
     const [processing, setProcessing] = useState(false);
+    const [qrUrl, setQrUrl] = useState(null);
+    const [exporting, setExporting] = useState(false);
+    const exportCardRef = useRef(null);
 
     const gender = state?.gender || state?.analysis?.gender || 'female';
     const bodyType = state?.bodyType || state?.analysis?.bodyType || 'natural';
@@ -331,6 +336,32 @@ function ResultPage2() {
         if (!photo) return;
         runMediaPipe(photo);
     }, [photo]);
+
+    async function handleExport() {
+        if (!exportCardRef.current) return;
+        setExporting(true);
+        try {
+            const canvas = await html2canvas(exportCardRef.current, {
+                useCORS: true,
+                scale: 2,
+                backgroundColor: '#ffffff',
+            });
+            const base64 = canvas.toDataURL('image/jpeg', 0.92);
+
+            const res = await fetch('http://localhost:3000/api/export-image', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ image: base64 }),
+            });
+            const data = await res.json();
+            setQrUrl(data.url);
+        } catch (err) {
+            console.error('내보내기 실패:', err);
+            alert('내보내기에 실패했습니다.');
+        } finally {
+            setExporting(false);
+        }
+    }
 
     async function runMediaPipe(photoDataUrl) {
         setProcessing(true);
@@ -557,14 +588,116 @@ function ResultPage2() {
                     }
                 `}</style>
 
-                <div className="flex justify-center mt-6">
+                <div className="flex justify-center gap-4 mt-6">
                     <button
                         onClick={() => navigate('/')}
-                        className="w-[300px] h-14 rounded-full bg-gradient-to-r from-purple-400 to-indigo-400 text-white text-xl font-extrabold shadow-lg hover:scale-105 transition"
+                        className="w-[280px] h-14 rounded-full bg-gradient-to-r from-purple-400 to-indigo-400 text-white text-xl font-extrabold shadow-lg hover:scale-105 transition"
                     >
                         ← 처음으로 돌아가기
                     </button>
+                    <button
+                        onClick={handleExport}
+                        disabled={exporting || processing}
+                        className={`w-[200px] h-14 rounded-full text-white text-lg font-extrabold shadow-lg transition ${
+                            exporting || processing
+                                ? 'bg-gray-400 cursor-not-allowed'
+                                : 'bg-gradient-to-r from-emerald-400 to-teal-500 hover:scale-105'
+                        }`}
+                    >
+                        {exporting ? '생성 중...' : '📱 결과 내보내기'}
+                    </button>
                 </div>
+
+                {/* ── 숨겨진 내보내기 카드 ── */}
+                <div style={{ position: 'fixed', left: '-9999px', top: 0 }}>
+                    <div
+                        ref={exportCardRef}
+                        style={{ width: 900, background: '#fff', padding: 32, fontFamily: 'sans-serif' }}
+                    >
+                        <h1 style={{ textAlign: 'center', fontSize: 26, fontWeight: 900, marginBottom: 24 }}>
+                            체형 분석 기반 코디 추천 결과
+                        </h1>
+
+                        {/* 상단: 사람 이미지 + 분석 텍스트 */}
+                        <div style={{ display: 'flex', gap: 24, marginBottom: 28 }}>
+                            {personImgUrl && (
+                                <img src={personImgUrl} alt="체형" style={{ width: 180, borderRadius: 12, objectFit: 'contain', background: '#1a1a2e' }} />
+                            )}
+                            <div style={{ flex: 1 }}>
+                                <h2 style={{ fontSize: 22, fontWeight: 900, color: '#7c3aed', marginBottom: 12 }}>
+                                    체형: {bodyTypeText}
+                                </h2>
+                                {metrics && (
+                                    <div style={{ background: '#111', color: '#4ade80', borderRadius: 8, padding: '8px 12px', fontSize: 13, fontFamily: 'monospace', marginBottom: 12 }}>
+                                        <div>SHR: <span style={{ color: '#fde047' }}>{metrics.shr.toFixed(3)}</span></div>
+                                        <div>어깨: <span style={{ color: '#fde047' }}>{(metrics.shoulderW * 100).toFixed(1)}%</span></div>
+                                        <div>힙: <span style={{ color: '#f9a8d4' }}>{(metrics.hipW * 100).toFixed(1)}%</span></div>
+                                        {metrics.bodyRatio != null && (
+                                            <div>상/하체: <span style={{ color: '#67e8f9' }}>{metrics.bodyRatio.toFixed(3)}</span></div>
+                                        )}
+                                    </div>
+                                )}
+                                <p style={{ fontSize: 14, lineHeight: 1.6, marginBottom: 8 }}><strong>숄더 라인:</strong> {bodyComment.shoulder}</p>
+                                <p style={{ fontSize: 14, lineHeight: 1.6, marginBottom: 8 }}><strong>하체 분석:</strong> {bodyComment.lower}</p>
+                                <p style={{ fontSize: 14, lineHeight: 1.6 }}><strong>코디 전략:</strong> {bodyComment.styling}</p>
+                            </div>
+                        </div>
+
+                        {/* 하단: 모든 스타일 카드 */}
+                        <h2 style={{ fontSize: 18, fontWeight: 900, marginBottom: 16 }}>추천 스타일</h2>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16 }}>
+                            {otherOutfits.map((outfit) => (
+                                <div key={outfit.id} style={{ border: '1px solid #e5e7eb', borderRadius: 12, padding: 16, background: '#f9fafb' }}>
+                                    <div style={{ display: 'flex', gap: 12 }}>
+                                        <img
+                                            src={outfit.image}
+                                            alt={outfit.title}
+                                            crossOrigin="anonymous"
+                                            style={{ width: 100, height: 120, objectFit: 'contain', borderRadius: 8, background: '#fff' }}
+                                        />
+                                        <div style={{ flex: 1 }}>
+                                            <h3 style={{ fontSize: 15, fontWeight: 900, color: '#7c3aed', marginBottom: 6 }}>[{outfit.title}]</h3>
+                                            <p style={{ fontSize: 12, lineHeight: 1.6, color: '#374151' }}>{outfit.desc}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+
+                {/* ── QR 모달 ── */}
+                {qrUrl && (
+                    <div
+                        className="fixed inset-0 bg-black/60 flex items-center justify-center z-50"
+                        onClick={() => setQrUrl(null)}
+                    >
+                        <div
+                            className="bg-white rounded-3xl p-8 flex flex-col items-center gap-4 shadow-2xl"
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <h2 className="text-xl font-extrabold text-gray-900">QR코드로 결과 저장</h2>
+                            <p className="text-sm text-gray-500 text-center">
+                                핸드폰 카메라로 QR을 스캔하면<br />결과 이미지를 저장할 수 있습니다
+                            </p>
+                            <QRCodeCanvas value={qrUrl} size={220} />
+                            <a
+                                href={qrUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-xs text-blue-500 underline break-all text-center max-w-xs"
+                            >
+                                {qrUrl}
+                            </a>
+                            <button
+                                onClick={() => setQrUrl(null)}
+                                className="mt-2 px-8 h-10 rounded-full bg-gray-200 text-gray-700 font-bold hover:bg-gray-300"
+                            >
+                                닫기
+                            </button>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );

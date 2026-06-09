@@ -3,6 +3,8 @@ const cors = require('cors');
 const multer = require('multer');
 const mongoose = require('mongoose');
 const { spawn } = require('child_process');
+const fs = require('fs');
+const path = require('path');
 require('dotenv').config();
 
 const app = express();
@@ -332,6 +334,28 @@ app.get('/api/fitting/:jobId', (req, res) => {
     const job = fittingJobs.get(req.params.jobId);
     if (!job) return res.status(404).json({ error: 'Job not found' });
     res.json(job);
+});
+
+/* =========================
+   결과 이미지 내보내기 API
+   base64 이미지 수신 → uploads/ 저장 → URL 반환
+========================= */
+app.post('/api/export-image', (req, res) => {
+    try {
+        const { image } = req.body;
+        if (!image) return res.status(400).json({ error: '이미지 없음' });
+
+        const base64Data = image.replace(/^data:image\/\w+;base64,/, '');
+        const filename = `export-${Date.now()}.jpg`;
+        const filepath = path.join(__dirname, 'uploads', filename);
+
+        fs.writeFileSync(filepath, Buffer.from(base64Data, 'base64'));
+
+        res.json({ url: `http://localhost:3000/uploads/${filename}` });
+    } catch (err) {
+        console.error('이미지 저장 실패:', err);
+        res.status(500).json({ error: '이미지 저장 실패' });
+    }
 });
 
 /* =========================
